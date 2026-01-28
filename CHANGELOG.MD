@@ -4,11 +4,19 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.1.4] - 2026-01-28
+### Changed
+- Updated timer bar text styling for improved readability:
+  - Bar text is rendered above the progress fill so it never disappears during countdown
+  - Timer text now uses a **black text + “white outline” look** (implemented via a white shadow, since outline color cannot be set directly)
+
+---
+
 ## [1.1.3] - 2026-01-28
 ### Changed
 - Improved timer bar text readability:
   - Timer text now renders **above** the progress fill so it never disappears as the bar counts down
-  - Countdown time and label text switched to **black text with a white outline** for stronger contrast
+  - Countdown time and label text styling improved for stronger contrast
 
 ---
 

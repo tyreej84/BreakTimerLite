@@ -11,7 +11,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.1.3"
+local ADDON_VERSION = "1.1.4"
 
 local defaults = {
   width = 260,
@@ -336,7 +336,8 @@ end
 
 -- ------------------------------------------------------------
 -- UI: Sleek bar (translucent black container + flat blue fill + thin edge line)
--- Fix: text is now ABOVE the fill (separate overlay frame with higher frame level)
+-- Text overlay frame is above the fill so it never disappears.
+-- Text style: BLACK text with a "white outline" look (shadow trick).
 -- ------------------------------------------------------------
 local Bar = CreateFrame("Frame", "BreakTimerLiteBar", UIParent, "BackdropTemplate")
 Bar:Hide()
@@ -385,25 +386,28 @@ Glow:SetAllPoints(Bar)
 Glow:SetColorTexture(1, 0.2, 0.2, 0)
 Glow:Hide()
 
--- Text overlay frame: sits above StatusBar fill so it never gets hidden.
 local TextOverlay = CreateFrame("Frame", nil, Bar)
 TextOverlay:SetAllPoints(Bar)
 TextOverlay:SetFrameStrata(Bar:GetFrameStrata())
 TextOverlay:SetFrameLevel(Bar:GetFrameLevel() + 20)
 
+-- BLACK text with "white outline" appearance:
+-- WoW outline color is not configurable, so we use a 1px white shadow to mimic white outline.
+local function ApplyWhiteOutlineLook(fs, size, justify)
+  fs:SetFont(STANDARD_TEXT_FONT, size or 12, "OUTLINE")
+  fs:SetTextColor(0, 0, 0, 1)      -- black text
+  fs:SetShadowColor(1, 1, 1, 1)    -- white "outline"
+  fs:SetShadowOffset(1, -1)
+  fs:SetJustifyH(justify or "LEFT")
+end
+
 local TextLeft = TextOverlay:CreateFontString(nil, "OVERLAY")
 TextLeft:SetPoint("LEFT", 6, 0)
-TextLeft:SetJustifyH("LEFT")
-TextLeft:SetFont(STANDARD_TEXT_FONT, 12, "OUTLINE")  -- white outline
-TextLeft:SetTextColor(0, 0, 0, 1)                    -- black text
-TextLeft:SetShadowOffset(0, 0)
+ApplyWhiteOutlineLook(TextLeft, 12, "LEFT")
 
 local TextRight = TextOverlay:CreateFontString(nil, "OVERLAY")
 TextRight:SetPoint("RIGHT", -6, 0)
-TextRight:SetJustifyH("RIGHT")
-TextRight:SetFont(STANDARD_TEXT_FONT, 12, "OUTLINE") -- white outline
-TextRight:SetTextColor(0, 0, 0, 1)                   -- black text
-TextRight:SetShadowOffset(0, 0)
+ApplyWhiteOutlineLook(TextRight, 12, "RIGHT")
 
 local function SetBarSize()
   Bar:SetSize(db.width, db.height)
