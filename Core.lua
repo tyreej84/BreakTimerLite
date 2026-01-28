@@ -11,7 +11,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.1.5"
+local ADDON_VERSION = "1.1.7"
 
 local defaults = {
   width = 260,
@@ -334,7 +334,7 @@ local function ShowBanner(mainText, subText)
 end
 
 -- ------------------------------------------------------------
--- UI: Sleek bar
+-- UI: Sleek bar (SIMPLE WHITE TEXT, no outline, no shadow)
 -- ------------------------------------------------------------
 local Bar = CreateFrame("Frame", "BreakTimerLiteBar", UIParent, "BackdropTemplate")
 Bar:Hide()
@@ -383,38 +383,26 @@ Glow:SetAllPoints(Bar)
 Glow:SetColorTexture(1, 0.2, 0.2, 0)
 Glow:Hide()
 
--- Text overlay frame above the fill
 local TextOverlay = CreateFrame("Frame", nil, Bar)
 TextOverlay:SetAllPoints(Bar)
 TextOverlay:SetFrameStrata(Bar:GetFrameStrata())
 TextOverlay:SetFrameLevel(Bar:GetFrameLevel() + 50)
 
--- TRUE white outline around black text (two layers)
-local function CreateWhiteOutlineText(parent, size, justify)
-  local outline = parent:CreateFontString(nil, "OVERLAY")
-  outline:SetFont(STANDARD_TEXT_FONT, size or 12, "OUTLINE")
-  outline:SetTextColor(1, 1, 1, 1) -- WHITE outline layer
-  outline:SetShadowOffset(0, 0)
-  outline:SetShadowColor(0, 0, 0, 0)
-  outline:SetJustifyH(justify or "LEFT")
-
-  local fill = parent:CreateFontString(nil, "OVERLAY")
-  fill:SetFont(STANDARD_TEXT_FONT, size or 12, "") -- no outline on fill
-  fill:SetTextColor(0, 0, 0, 1) -- BLACK fill
-  fill:SetShadowOffset(0, 0)
-  fill:SetShadowColor(0, 0, 0, 0)
-  fill:SetJustifyH(justify or "LEFT")
-
-  return { outline = outline, fill = fill }
+local function StyleBarText(fs, size, justify)
+  fs:SetFont(STANDARD_TEXT_FONT, size or 12, "")     -- no outline
+  fs:SetTextColor(1, 1, 1, 1)                        -- simple white
+  fs:SetShadowColor(0, 0, 0, 0)                      -- no shadow
+  fs:SetShadowOffset(0, 0)
+  fs:SetJustifyH(justify or "LEFT")
 end
 
-local TextLeft = CreateWhiteOutlineText(TextOverlay, 12, "LEFT")
-TextLeft.outline:SetPoint("LEFT", 6, 0)
-TextLeft.fill:SetPoint("LEFT", 6, 0)
+local TextLeft = TextOverlay:CreateFontString(nil, "OVERLAY")
+TextLeft:SetPoint("LEFT", 6, 0)
+StyleBarText(TextLeft, 12, "LEFT")
 
-local TextRight = CreateWhiteOutlineText(TextOverlay, 12, "RIGHT")
-TextRight.outline:SetPoint("RIGHT", -6, 0)
-TextRight.fill:SetPoint("RIGHT", -6, 0)
+local TextRight = TextOverlay:CreateFontString(nil, "OVERLAY")
+TextRight:SetPoint("RIGHT", -6, 0)
+StyleBarText(TextRight, 12, "RIGHT")
 
 local function SetBarSize()
   Bar:SetSize(db.width, db.height)
@@ -429,7 +417,7 @@ local function SetBarPoint()
 end
 
 -- ------------------------------------------------------------
--- UI: Big center timer
+-- UI: Big center timer (unchanged)
 -- ------------------------------------------------------------
 local Big = CreateFrame("Frame", "BreakTimerLiteBigFrame", UIParent)
 Big:Hide()
@@ -505,6 +493,7 @@ local function FadeFrameTo(frame, targetAlpha, duration)
     frame:SetAlpha(startAlpha + (targetAlpha - startAlpha) * t)
   end)
 end
+
 
 -- ------------------------------------------------------------
 -- Timer state
