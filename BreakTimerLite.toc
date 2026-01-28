@@ -1,7 +1,7 @@
 ## Interface: 120000
 ## Title: BreakTimerLite
 ## Notes: DBM-style break timer replacement (synced; leader/assist only; Blizzard countdown 10; DBM visuals; extend; late-join sync; conflict resolution).
-## Author: You
+## Author: Karnytine-Stormrage (joe@tyreenet.com)
 ## Version: 1.0.7
 ## SavedVariables: BreakTimerDB
 
