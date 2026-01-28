@@ -1,0 +1,47 @@
+name: Build addon zip for releases
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build addon folder
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist/BreakTimerLite
+
+          # Copy only the addon runtime files:
+          cp -v BreakTimerLite.toc dist/BreakTimerLite/
+          cp -v BreakTimerLite.lua dist/BreakTimerLite/ || true
+
+          # If you have multiple lua files, xml, media, etc:
+          find . -maxdepth 1 -type f \( -name "*.lua" -o -name "*.xml" \) -print -exec cp -v {} dist/BreakTimerLite/ \;
+
+          # Copy folders if they exist (uncomment as needed):
+          # [ -d Media ] && cp -rv Media dist/BreakTimerLite/
+          # [ -d Libs ] && cp -rv Libs dist/BreakTimerLite/
+          # [ -d Locale ] && cp -rv Locale dist/BreakTimerLite/
+
+      - name: Create zip (folder inside zip is BreakTimerLite/)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          zip -r ../BreakTimerLite.zip BreakTimerLite
+
+      - name: Upload zip to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: BreakTimerLite.zip
