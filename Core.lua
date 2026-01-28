@@ -11,7 +11,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.1.7"
+local ADDON_VERSION = "1.1.8"
 
 local defaults = {
   width = 260,
@@ -214,6 +214,7 @@ end
 
 -- ------------------------------------------------------------
 -- Blizzard countdown text (same as /cd 10)
+-- Triggered at 10s remaining. If we're not privileged, request a privileged member do it.
 -- ------------------------------------------------------------
 local function DoBlizzardCountdown10()
   if not (C_PartyInfo and C_PartyInfo.DoCountdown) then return false end
@@ -334,7 +335,9 @@ local function ShowBanner(mainText, subText)
 end
 
 -- ------------------------------------------------------------
--- UI: Sleek bar (SIMPLE WHITE TEXT, no outline, no shadow)
+-- UI: Sleek bar (translucent black container + flat blue fill + thin edge line)
+-- Text overlay frame is above the fill so it never disappears.
+-- Text style: SIMPLE WHITE (no outline, no shadow)
 -- ------------------------------------------------------------
 local Bar = CreateFrame("Frame", "BreakTimerLiteBar", UIParent, "BackdropTemplate")
 Bar:Hide()
@@ -383,15 +386,16 @@ Glow:SetAllPoints(Bar)
 Glow:SetColorTexture(1, 0.2, 0.2, 0)
 Glow:Hide()
 
+-- text overlay on top
 local TextOverlay = CreateFrame("Frame", nil, Bar)
 TextOverlay:SetAllPoints(Bar)
 TextOverlay:SetFrameStrata(Bar:GetFrameStrata())
-TextOverlay:SetFrameLevel(Bar:GetFrameLevel() + 50)
+TextOverlay:SetFrameLevel(Bar:GetFrameLevel() + 20)
 
 local function StyleBarText(fs, size, justify)
-  fs:SetFont(STANDARD_TEXT_FONT, size or 12, "")     -- no outline
-  fs:SetTextColor(1, 1, 1, 1)                        -- simple white
-  fs:SetShadowColor(0, 0, 0, 0)                      -- no shadow
+  fs:SetFont(STANDARD_TEXT_FONT, size or 12, "") -- no outline
+  fs:SetTextColor(1, 1, 1, 1)                   -- simple white
+  fs:SetShadowColor(0, 0, 0, 0)                 -- no shadow
   fs:SetShadowOffset(0, 0)
   fs:SetJustifyH(justify or "LEFT")
 end
@@ -417,7 +421,7 @@ local function SetBarPoint()
 end
 
 -- ------------------------------------------------------------
--- UI: Big center timer (unchanged)
+-- UI: Big center timer
 -- ------------------------------------------------------------
 local Big = CreateFrame("Frame", "BreakTimerLiteBigFrame", UIParent)
 Big:Hide()
@@ -494,7 +498,6 @@ local function FadeFrameTo(frame, targetAlpha, duration)
   end)
 end
 
-
 -- ------------------------------------------------------------
 -- Timer state
 -- ------------------------------------------------------------
@@ -552,7 +555,8 @@ local function BuildBarLeftText()
 end
 
 local function SetBarColor()
-  Status:SetStatusBarColor(0.15, 0.55, 1.00)
+  -- slightly translucent blue so the black track can be seen underneath as it shrinks
+  Status:SetStatusBarColor(0.15, 0.55, 1.00, 0.90)
 end
 
 local function UpdateEdgeLine(pct)
@@ -563,13 +567,6 @@ local function UpdateEdgeLine(pct)
   EdgeLine:SetShown(pct > 0.001)
 end
 
-local function SetBarTexts(leftText, rightText)
-  TextLeft.outline:SetText(leftText or "")
-  TextLeft.fill:SetText(leftText or "")
-  TextRight.outline:SetText(rightText or "")
-  TextRight.fill:SetText(rightText or "")
-end
-
 local function UpdateBar(rem)
   local pct = 0
   if state.duration > 0 then pct = rem / state.duration end
@@ -577,7 +574,8 @@ local function UpdateBar(rem)
   Status:SetValue(pct)
   SetBarColor()
 
-  SetBarTexts(BuildBarLeftText(), FormatTime(rem))
+  TextLeft:SetText(BuildBarLeftText())
+  TextRight:SetText(FormatTime(rem))
 
   UpdateEdgeLine(pct)
 

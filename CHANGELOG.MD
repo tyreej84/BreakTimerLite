@@ -4,28 +4,35 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.1.8] - 2026-01-28
+### Fixed
+- Restored full timer functionality after a bad update (ticker/UI updates and text objects were missing).
+### Changed
+- Timer bar text is now **simple white** (no outline, no shadow), rendered above the progress fill.
+
+---
+
 ## [1.1.7] - 2026-01-28
 ### Changed
-- Timer bar text simplified:
-  - Switched to **plain white text** (no outline, no shadow), rendered above the progress fill.
+- Timer bar text styling adjustments (experimental).
 
 ---
 
 ## [1.1.6] - 2026-01-28
 ### Changed
-- Adjusted timer bar text styling (outline/shadow variants).
+- Timer bar text styling adjustments (experimental).
 
 ---
 
 ## [1.1.5] - 2026-01-28
 ### Changed
-- Implemented layered text outline experiment.
+- Timer bar text outline experiment.
 
 ---
 
 ## [1.1.4] - 2026-01-28
 ### Changed
-- Attempted “white outline” styling for bar text.
+- Timer bar text styling experiment.
 
 ---
 
@@ -39,7 +46,6 @@ All notable changes to **Break Timer Lite** are documented in this file.
 ### Added
 - Blizzard **/cd-style countdown text** starts automatically at **10 seconds remaining**
 - Countdown start is synchronized across the group (`CDREQUEST` / `COUNTDOWN`)
-
 ### Changed
 - Removed the minimap button and all minimap-related options/settings
 
