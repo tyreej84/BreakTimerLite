@@ -11,7 +11,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.1.4"
+local ADDON_VERSION = "1.1.5"
 
 local defaults = {
   width = 260,
@@ -214,7 +214,6 @@ end
 
 -- ------------------------------------------------------------
 -- Blizzard countdown text (same as /cd 10)
--- Triggered at 10s remaining. If we're not privileged, request a privileged member do it.
 -- ------------------------------------------------------------
 local function DoBlizzardCountdown10()
   if not (C_PartyInfo and C_PartyInfo.DoCountdown) then return false end
@@ -335,9 +334,7 @@ local function ShowBanner(mainText, subText)
 end
 
 -- ------------------------------------------------------------
--- UI: Sleek bar (translucent black container + flat blue fill + thin edge line)
--- Text overlay frame is above the fill so it never disappears.
--- Text style: BLACK text with a "white outline" look (shadow trick).
+-- UI: Sleek bar
 -- ------------------------------------------------------------
 local Bar = CreateFrame("Frame", "BreakTimerLiteBar", UIParent, "BackdropTemplate")
 Bar:Hide()
@@ -386,28 +383,38 @@ Glow:SetAllPoints(Bar)
 Glow:SetColorTexture(1, 0.2, 0.2, 0)
 Glow:Hide()
 
+-- Text overlay frame above the fill
 local TextOverlay = CreateFrame("Frame", nil, Bar)
 TextOverlay:SetAllPoints(Bar)
 TextOverlay:SetFrameStrata(Bar:GetFrameStrata())
-TextOverlay:SetFrameLevel(Bar:GetFrameLevel() + 20)
+TextOverlay:SetFrameLevel(Bar:GetFrameLevel() + 50)
 
--- BLACK text with "white outline" appearance:
--- WoW outline color is not configurable, so we use a 1px white shadow to mimic white outline.
-local function ApplyWhiteOutlineLook(fs, size, justify)
-  fs:SetFont(STANDARD_TEXT_FONT, size or 12, "OUTLINE")
-  fs:SetTextColor(0, 0, 0, 1)      -- black text
-  fs:SetShadowColor(1, 1, 1, 1)    -- white "outline"
-  fs:SetShadowOffset(1, -1)
-  fs:SetJustifyH(justify or "LEFT")
+-- TRUE white outline around black text (two layers)
+local function CreateWhiteOutlineText(parent, size, justify)
+  local outline = parent:CreateFontString(nil, "OVERLAY")
+  outline:SetFont(STANDARD_TEXT_FONT, size or 12, "OUTLINE")
+  outline:SetTextColor(1, 1, 1, 1) -- WHITE outline layer
+  outline:SetShadowOffset(0, 0)
+  outline:SetShadowColor(0, 0, 0, 0)
+  outline:SetJustifyH(justify or "LEFT")
+
+  local fill = parent:CreateFontString(nil, "OVERLAY")
+  fill:SetFont(STANDARD_TEXT_FONT, size or 12, "") -- no outline on fill
+  fill:SetTextColor(0, 0, 0, 1) -- BLACK fill
+  fill:SetShadowOffset(0, 0)
+  fill:SetShadowColor(0, 0, 0, 0)
+  fill:SetJustifyH(justify or "LEFT")
+
+  return { outline = outline, fill = fill }
 end
 
-local TextLeft = TextOverlay:CreateFontString(nil, "OVERLAY")
-TextLeft:SetPoint("LEFT", 6, 0)
-ApplyWhiteOutlineLook(TextLeft, 12, "LEFT")
+local TextLeft = CreateWhiteOutlineText(TextOverlay, 12, "LEFT")
+TextLeft.outline:SetPoint("LEFT", 6, 0)
+TextLeft.fill:SetPoint("LEFT", 6, 0)
 
-local TextRight = TextOverlay:CreateFontString(nil, "OVERLAY")
-TextRight:SetPoint("RIGHT", -6, 0)
-ApplyWhiteOutlineLook(TextRight, 12, "RIGHT")
+local TextRight = CreateWhiteOutlineText(TextOverlay, 12, "RIGHT")
+TextRight.outline:SetPoint("RIGHT", -6, 0)
+TextRight.fill:SetPoint("RIGHT", -6, 0)
 
 local function SetBarSize()
   Bar:SetSize(db.width, db.height)
@@ -567,6 +574,13 @@ local function UpdateEdgeLine(pct)
   EdgeLine:SetShown(pct > 0.001)
 end
 
+local function SetBarTexts(leftText, rightText)
+  TextLeft.outline:SetText(leftText or "")
+  TextLeft.fill:SetText(leftText or "")
+  TextRight.outline:SetText(rightText or "")
+  TextRight.fill:SetText(rightText or "")
+end
+
 local function UpdateBar(rem)
   local pct = 0
   if state.duration > 0 then pct = rem / state.duration end
@@ -574,8 +588,7 @@ local function UpdateBar(rem)
   Status:SetValue(pct)
   SetBarColor()
 
-  TextLeft:SetText(BuildBarLeftText())
-  TextRight:SetText(FormatTime(rem))
+  SetBarTexts(BuildBarLeftText(), FormatTime(rem))
 
   UpdateEdgeLine(pct)
 
