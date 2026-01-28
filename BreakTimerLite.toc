@@ -2,7 +2,7 @@
 ## Title: Break Timer Lite
 ## Notes: A synced break timer for groups and raids (leader/assist only) with bar + center timer, Blizzard countdown support, late-join sync, and options.
 ## Author: Karnytine-Stormrage (joe@tyreenet.com)
-## Version: 1.0.8
+## Version: 1.1.1
 ## SavedVariables: BreakTimerDB
 
 Core.lua
