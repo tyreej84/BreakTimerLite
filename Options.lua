@@ -1,9 +1,9 @@
--- BreakTimerLite - Options.lua
--- Sync always enabled; no sync toggle.
+-- Break Timer Lite - Options.lua
+-- Sync is always enabled; no sync toggle.
 
 local ADDON, ns = ...
 local panel = CreateFrame("Frame")
-panel.name = "BreakTimerLite"
+panel.name = "Break Timer Lite"
 
 local function MakeCheckbox(parent, label, tooltip, get, set, x, y)
   local cb = CreateFrame("CheckButton", nil, parent, "InterfaceOptionsCheckButtonTemplate")
@@ -63,14 +63,14 @@ panel:SetScript("OnShow", function(self)
 
   local title = self:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
   title:SetPoint("TOPLEFT", 16, -16)
-  title:SetText("BreakTimerLite")
+  title:SetText("Break Timer Lite")
 
   local tip = self:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
   tip:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-  tip:SetText("Sync always enabled. Commands: /break [minutes] [reason], /break +5, /break extend 5, /break stop, /break status. Aliases: /breaktimer /breaktime /bt")
+  tip:SetText("Sync is always on. Commands: /break [minutes] [reason], /break +5, /break extend 5, /break stop, /break status. Aliases: /breaktimer /breaktime /bt")
 
   -- Left column
-  MakeCheckbox(self, "Show minimap button", "Show/hide the minimap button.",
+  MakeCheckbox(self, "Show minimap button", "Show or hide the minimap button.",
     function() return not db.minimap.hide end,
     function(v)
       db.minimap.hide = not v
@@ -85,7 +85,7 @@ panel:SetScript("OnShow", function(self)
     16, -110
   )
 
-  MakeCheckbox(self, "Enable center banner", "Show DBM-style banners on start/extend/end/cancel.",
+  MakeCheckbox(self, "Enable center banner", "Show banners on start, extend, end, and cancel.",
     function() return db.banner.enabled end,
     function(v) db.banner.enabled = v and true or false end,
     16, -170
@@ -104,7 +104,7 @@ panel:SetScript("OnShow", function(self)
   )
 
   -- Right column
-  MakeCheckbox(self, "Announce to group", "Send DBM-like start/extend/end lines to party/raid/instance chat (smart rules apply).",
+  MakeCheckbox(self, "Announce to group", "Send start/extend/end lines to party/raid/instance chat (smart rules apply).",
     function() return db.announce end,
     function(v) db.announce = v and true or false end,
     320, -60
@@ -122,25 +122,25 @@ panel:SetScript("OnShow", function(self)
     320, -120
   )
 
-  MakeCheckbox(self, "Reminder messages (2:00/1:00/0:30/0:10)", "DBM-ish reminder cadence.",
+  MakeCheckbox(self, "Reminder messages (2:00 / 1:00 / 0:30 / 0:10)", "Reminder cadence as the break ends.",
     function() return db.remind end,
     function(v) db.remind = v and true or false end,
     320, -150
   )
 
-  MakeCheckbox(self, "Beep at 10/3/1 (built-in)", "Extra beeps on 10, 3, and 1 seconds remaining.",
+  MakeCheckbox(self, "Beep at 10 / 3 / 1 (built-in)", "Extra beeps on 10, 3, and 1 seconds remaining.",
     function() return db.beeps end,
     function(v) db.beeps = v and true or false end,
     320, -180
   )
 
-  MakeCheckbox(self, "Screen-edge pulse last 10s", "DBM-ish urgency pulse on the screen edges in the last 10 seconds.",
+  MakeCheckbox(self, "Screen-edge pulse last 10s", "Adds urgency pulse on the screen edges in the last 10 seconds.",
     function() return db.edgePulse end,
     function(v) db.edgePulse = v and true or false end,
     320, -210
   )
 
-  MakeCheckbox(self, "Ready check when break ends", "Leader/assist only. Triggers a ready check after break ends.",
+  MakeCheckbox(self, "Ready check when break ends", "Leader/assist only. Triggers a ready check after the break ends.",
     function() return db.readyCheckOnEnd end,
     function(v) db.readyCheckOnEnd = v and true or false end,
     320, -240
@@ -176,7 +176,7 @@ panel:SetScript("OnShow", function(self)
 
   local help = self:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
   help:SetPoint("TOPLEFT", 16, -392)
-  help:SetText("Move bar + big timer: hold ALT and drag. Late-join sync + conflict resolution + version handshake are always on.")
+  help:SetText("Move bar + big timer: hold ALT and drag. Late-join sync, conflict handling, and version handshake are always on.")
 end)
 
 RegisterOptions(panel)

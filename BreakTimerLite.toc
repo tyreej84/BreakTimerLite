@@ -1,8 +1,8 @@
 ## Interface: 120000
-## Title: BreakTimerLite
-## Notes: DBM-style break timer replacement (synced; leader/assist only; Blizzard countdown 10; DBM visuals; extend; late-join sync; conflict resolution).
+## Title: Break Timer Lite
+## Notes: A synced break timer for groups and raids (leader/assist only) with bar + center timer, Blizzard countdown support, late-join sync, and options.
 ## Author: Karnytine-Stormrage (joe@tyreenet.com)
-## Version: 1.0.7
+## Version: 1.0.8
 ## SavedVariables: BreakTimerDB
 
 Core.lua

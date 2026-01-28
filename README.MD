@@ -1,22 +1,31 @@
-# BreakTimerLite
+# Break Timer Lite
 
-A lightweight **DBM-style break timer** replacement for World of Warcraft.
+**Break Timer Lite** is a lightweight, fully synced break timer addon for World of Warcraft.
+
+It provides a clear, authoritative break timer for groups and raids with strong visuals, synced state, and built-in Blizzard countdown support.
+
+---
 
 ## What it does
-- **Synced timer** for the whole group (addon sync is always on)
-- **Only leader/assist can start/stop/extend** while grouped
-- **DBM-ish visuals**: bar + big center timer + banners + urgency effects
-- Uses **Blizzard’s built-in countdown** (started at **10** seconds; Blizzard voice typically plays **5 → 1**)
+- **Synced break timer** for the entire group (addon sync is always on)
+- **Only leader/assist can start, stop, or extend** while grouped
+- Clear **timer bar + large center countdown**
+- Center-screen banners for start, extend, end, and cancel
+- Uses **Blizzard’s built-in countdown**, started at **10 seconds**
+  - Blizzard audio typically plays from **5 → 1**
 
-## Commands (DBM-like)
+---
+
+## Commands
+
 Primary:
-- `/break [minutes] [reason]`  
-  - If no args: starts your **default duration**
-- `/break +<minutes>` (extend)
-- `/break extend <minutes>` (extend)
-- `/break stop`
-- `/break status`
-- `/break options`
+- `/break [minutes] [reason]`
+  - If no arguments are provided, starts the configured default duration
+- `/break +<minutes>` — extend the current break
+- `/break extend <minutes>` — extend the current break
+- `/break stop` — cancel the break
+- `/break status` — show remaining time and caller
+- `/break options` — open settings
 
 Aliases:
 - `/breaktimer`
@@ -24,56 +33,76 @@ Aliases:
 - `/bt`
 
 Examples:
-- `/break` (starts default minutes)
+- `/break`
 - `/break 5 bio`
 - `/break +5`
 - `/break status`
 - `/break stop`
 
+---
+
 ## Sync behavior
+
 ### Always-on sync
-If other players have BreakTimerLite installed, they’ll see the same:
-- timer bar
-- big center countdown
-- extend/cancel/end
+All players with Break Timer Lite installed will see the same:
+- Timer bar
+- Center countdown
+- Extensions and cancellations
 
-### Late-join sync
-If someone joins while a break is already running, their addon will automatically request the current state and display it.
+### Late join support
+Players who join while a break is already running will automatically request and receive the current break state.
 
-### Conflict resolution
-If multiple timers collide:
-- Higher authority wins (Raid Leader > Assist > Party Leader)
-- If equal authority, the newer timer (timestamp) wins
+### Authority rules
+- **Party:** Party Leader only
+- **Raid:** Raid Leader and Assist
+- **Solo:** Always allowed
 
-### Version handshake
-Players exchange versions automatically and you’ll see a warning if someone is running an older or incompatible major version.
+### Conflict handling
+If multiple break timers collide:
+- Higher authority wins
+- If authority is equal, the newer timer (server timestamp) wins
 
-## DBM-ish visuals
-- Bar color shifts (green → yellow → red)
-- **Spark** at the end of the bar
-- **Glow** overlay in last 10 seconds
-- Big timer pulse/shake/flash in the last seconds
-- **Center banner**: start / extend / end / cancel
-- Optional **screen-edge pulse** in the last 10 seconds
+---
+
+## Visual features
+- Color-changing timer bar (green → yellow → red)
+- Spark and glow effects as the timer nears completion
+- Large center countdown with:
+  - Pulse during the last 10 seconds
+  - Shake and flash effects in the final seconds
+- Screen-edge pulse during the last 10 seconds
+- Center banner messages for:
+  - Break started
+  - Break extended
+  - Break ended
+  - Break canceled
+
+---
 
 ## Audio
-- Blizzard countdown is triggered at 10 seconds on break start
-- Optional extra built-in **beeps at 10/3/1**
+- Blizzard group countdown is triggered at 10 seconds
+- Optional built-in beeps at **10 / 3 / 1** seconds
+- No custom sound files required
+
+---
 
 ## Optional ready check
-Optionally triggers a ready check at the end of break (leader/assist only).
+If enabled, a ready check is automatically triggered when the break ends (leader/assist only).
 
-## Install
-Copy this folder to:
-`World of Warcraft/_retail_/Interface/AddOns/BreakTimerLite/`
+---
 
-Contains:
+## Installation
+Copy the addon folder to:
+
+The folder should contain:
 - `BreakTimerLite.toc`
 - `Core.lua`
 - `Options.lua`
 
-Reload:
+Reload your UI:
 - `/reload`
 
+---
+
 ## License
-MIT — see `LICENSE.md`.
+MIT — see `LICENSE.md`
