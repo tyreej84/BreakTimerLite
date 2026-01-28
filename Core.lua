@@ -1,4 +1,5 @@
 -- Break Timer Lite - Core.lua
+-- No group/raid chat spam (local-only visuals/sounds), but still syncs timers.
 -- Commands:
 --   /break [minutes] [reason]
 --   /break +<minutes>
@@ -11,7 +12,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.1.8"
+local ADDON_VERSION = "1.2.0"
 
 local defaults = {
   width = 260,
@@ -19,13 +20,12 @@ local defaults = {
   point = { "CENTER", "UIParent", "CENTER", 0, 180 },
 
   defaultMinutes = 5,
-  smartAnnounce = true,
-  smartAnnounceMinSeconds = 30,
 
-  announce = true,
-  raidWarning = true,
+  -- chat output disabled (kept for compatibility; ignored)
+  announce = false,
+  raidWarning = true,   -- local raid warning frame only
+
   sound = true,
-  remind = true,
   label = "Break",
 
   beeps = true,
@@ -67,8 +67,8 @@ local function NowServer()
   return time()
 end
 
-local function FormatTime(sec)
-  sec = math.max(0, math.floor(sec + 0.5))
+local function FormatTimeFromSeconds(sec)
+  sec = math.max(0, math.floor(sec))
   local m = math.floor(sec / 60)
   local s = sec % 60
   return string.format("%d:%02d", m, s)
@@ -79,6 +79,7 @@ local function LocalPrint(msg)
 end
 
 local function BigWarnLocal(msg)
+  if not db.raidWarning then return end
   RaidNotice_AddMessage(RaidWarningFrame, msg, ChatTypeInfo["RAID_WARNING"])
 end
 
@@ -156,50 +157,16 @@ local function SenderIsPrivileged(sender)
   return SenderAuthorityRank(sender) >= 2
 end
 
-local function CanRaidWarn()
-  return IsInRaid() and (UnitIsGroupLeader("player") or UnitIsGroupAssistant("player"))
-end
-
--- ------------------------------------------------------------
--- Announcement formatting
--- ------------------------------------------------------------
-local function FormatAnnounceLine(title, reason, timeStr)
-  local t = title or "Break"
-  local r = reason and reason ~= "" and (" (" .. reason .. ")") or ""
-  local s = timeStr and timeStr ~= "" and (" - " .. timeStr) or ""
-  return string.format("*** %s%s%s ***", t, r, s)
-end
-
 -- ------------------------------------------------------------
 -- Throttle
 -- ------------------------------------------------------------
-local throttle = { lastSync = 0, lastAnnounce = 0, lastRequest = 0, lastHello = 0 }
-local function Throttled(kind, window)
+local throttle = { lastSync = 0, lastHello = 0, lastRequest = 0 }
+local function Throttled(key, window)
   window = window or 0.6
   local t = GetTime()
-  local key = "last" .. kind
-  if throttle[key] and (t - throttle[key] < window) then
-    return true
-  end
+  if throttle[key] and (t - throttle[key] < window) then return true end
   throttle[key] = t
   return false
-end
-
--- ------------------------------------------------------------
--- Announce
--- ------------------------------------------------------------
-local function DoAnnounce(msg)
-  if not db.announce then return end
-  local ch = GetGroupChannel()
-  if not ch then return end
-  if Throttled("Announce", 0.35) then return end
-
-  if db.raidWarning and ch == "RAID" and CanRaidWarn() then
-    RaidNotice_AddMessage(RaidWarningFrame, msg, ChatTypeInfo["RAID_WARNING"])
-    SendChatMessage(msg, "RAID_WARNING")
-  else
-    SendChatMessage(msg, ch)
-  end
 end
 
 -- ------------------------------------------------------------
@@ -208,13 +175,12 @@ end
 local function SyncSend(payload)
   local ch = GetGroupChannel()
   if not ch then return end
-  if Throttled("Sync", 0.25) then return end
+  if Throttled("lastSync", 0.25) then return end
   C_ChatInfo.SendAddonMessage(PREFIX, payload, ch)
 end
 
 -- ------------------------------------------------------------
 -- Blizzard countdown text (same as /cd 10)
--- Triggered at 10s remaining. If we're not privileged, request a privileged member do it.
 -- ------------------------------------------------------------
 local function DoBlizzardCountdown10()
   if not (C_PartyInfo and C_PartyInfo.DoCountdown) then return false end
@@ -335,9 +301,7 @@ local function ShowBanner(mainText, subText)
 end
 
 -- ------------------------------------------------------------
--- UI: Sleek bar (translucent black container + flat blue fill + thin edge line)
--- Text overlay frame is above the fill so it never disappears.
--- Text style: SIMPLE WHITE (no outline, no shadow)
+-- UI: Sleek bar (simple white text)
 -- ------------------------------------------------------------
 local Bar = CreateFrame("Frame", "BreakTimerLiteBar", UIParent, "BackdropTemplate")
 Bar:Hide()
@@ -386,16 +350,15 @@ Glow:SetAllPoints(Bar)
 Glow:SetColorTexture(1, 0.2, 0.2, 0)
 Glow:Hide()
 
--- text overlay on top
 local TextOverlay = CreateFrame("Frame", nil, Bar)
 TextOverlay:SetAllPoints(Bar)
 TextOverlay:SetFrameStrata(Bar:GetFrameStrata())
 TextOverlay:SetFrameLevel(Bar:GetFrameLevel() + 20)
 
 local function StyleBarText(fs, size, justify)
-  fs:SetFont(STANDARD_TEXT_FONT, size or 12, "") -- no outline
-  fs:SetTextColor(1, 1, 1, 1)                   -- simple white
-  fs:SetShadowColor(0, 0, 0, 0)                 -- no shadow
+  fs:SetFont(STANDARD_TEXT_FONT, size or 12, "")
+  fs:SetTextColor(1, 1, 1, 1)
+  fs:SetShadowColor(0, 0, 0, 0)
   fs:SetShadowOffset(0, 0)
   fs:SetJustifyH(justify or "LEFT")
 end
@@ -505,7 +468,6 @@ local state = {
   running = false,
   startServer = 0,
   endServer = 0,
-  startLocal = 0,
   endLocal = 0,
 
   duration = 0,
@@ -515,7 +477,6 @@ local state = {
 
   ticker = nil,
   warned10 = false,
-  reminded = {},
   lastWhole = nil,
   baseBigScale = 1.6,
   shakeSeed = 0,
@@ -523,20 +484,17 @@ local state = {
   cdStarted = false,
 }
 
-local function ResetReminderFlags()
-  state.warned10 = false
-  state.reminded = { [120]=false, [60]=false, [30]=false, [10]=false }
-  state.lastWhole = nil
-  state.shakeSeed = 0
-  state.cdStarted = false
-end
-
 local function StopTicker()
   if state.ticker then state.ticker:Cancel(); state.ticker = nil end
 end
 
-local function Remaining()
+local function RemainingPrecise()
   return state.endLocal - GetTime()
+end
+
+-- Display seconds are CEIL(rem) to match Blizzard countdown integer boundaries.
+local function RemainingDisplaySeconds(remPrecise)
+  return math.max(0, math.ceil(remPrecise))
 end
 
 local function Beep()
@@ -555,7 +513,6 @@ local function BuildBarLeftText()
 end
 
 local function SetBarColor()
-  -- slightly translucent blue so the black track can be seen underneath as it shrinks
   Status:SetStatusBarColor(0.15, 0.55, 1.00, 0.90)
 end
 
@@ -567,19 +524,19 @@ local function UpdateEdgeLine(pct)
   EdgeLine:SetShown(pct > 0.001)
 end
 
-local function UpdateBar(rem)
+local function UpdateBar(remPrecise)
   local pct = 0
-  if state.duration > 0 then pct = rem / state.duration end
+  if state.duration > 0 then pct = remPrecise / state.duration end
   pct = math.max(0, math.min(1, pct))
   Status:SetValue(pct)
   SetBarColor()
 
   TextLeft:SetText(BuildBarLeftText())
-  TextRight:SetText(FormatTime(rem))
+  TextRight:SetText(FormatTimeFromSeconds(RemainingDisplaySeconds(remPrecise)))
 
   UpdateEdgeLine(pct)
 
-  if rem <= 10 then
+  if remPrecise <= 10 then
     Glow:Show()
     local pulse = 0.10 + 0.14 * (0.5 + 0.5 * math.sin(GetTime() * 10))
     Glow:SetAlpha(pulse)
@@ -589,11 +546,11 @@ local function UpdateBar(rem)
   end
 end
 
-local function SetBigColorByRemaining(rem)
-  if rem <= 10 then
+local function SetBigColorByRemaining(remPrecise)
+  if remPrecise <= 10 then
     Big.text:SetTextColor(1, 0.2, 0.2)
     Big.header:SetTextColor(1, 0.2, 0.2)
-  elseif rem <= 30 then
+  elseif remPrecise <= 30 then
     Big.text:SetTextColor(1, 0.85, 0.2)
     Big.header:SetTextColor(1, 0.85, 0.2)
   else
@@ -602,10 +559,10 @@ local function SetBigColorByRemaining(rem)
   end
 end
 
-local function UpdateBig(rem, whole)
+local function UpdateBig(remPrecise, whole)
   if not db.big.enabled then return end
 
-  Big.text:SetText(FormatTime(rem))
+  Big.text:SetText(FormatTimeFromSeconds(whole))
   if state.reason ~= "" then
     Big.sub:SetText(state.reason)
     Big.sub:Show()
@@ -613,17 +570,17 @@ local function UpdateBig(rem, whole)
     Big.sub:SetText("")
     Big.sub:Hide()
   end
-  SetBigColorByRemaining(rem)
+  SetBigColorByRemaining(remPrecise)
 
-  if db.big.pulseLast10 and rem <= 10 then
-    local frac = rem - math.floor(rem)
+  if db.big.pulseLast10 and remPrecise <= 10 then
+    local frac = remPrecise - math.floor(remPrecise)
     local bump = 1 + (0.08 * math.sin(frac * 2 * math.pi))
     Big:SetScale(state.baseBigScale * bump)
   else
     Big:SetScale(state.baseBigScale)
   end
 
-  if db.big.shakeLast5 and rem <= 5 then
+  if db.big.shakeLast5 and remPrecise <= 5 then
     state.shakeSeed = state.shakeSeed + 1
     local dx = ((state.shakeSeed * 37) % 7) - 3
     local dy = ((state.shakeSeed * 53) % 7) - 3
@@ -632,16 +589,9 @@ local function UpdateBig(rem, whole)
     Big.text:SetPoint("CENTER", 0, 0)
   end
 
-  if db.big.flashLast5 and whole and whole <= 5 and whole >= 1 then
+  if db.big.flashLast5 and whole <= 5 and whole >= 1 then
     if state.lastWhole ~= whole then BigFlashPulse() end
   end
-
-  state.lastWhole = whole
-end
-
-local function ShouldAnnounceFor(seconds)
-  if not db.smartAnnounce then return true end
-  return seconds >= (db.smartAnnounceMinSeconds or 30)
 end
 
 local function TryReadyCheck()
@@ -657,6 +607,13 @@ local function ShouldAcceptRemote(startServer, authorityRank)
   return startServer > (state.startServer or 0)
 end
 
+local function ResetFlags()
+  state.warned10 = false
+  state.lastWhole = nil
+  state.shakeSeed = 0
+  state.cdStarted = false
+end
+
 local function StartTimerWithServerTimes(startServer, endServer, reason, caller, authority, silent, fromSync)
   local seconds = math.max(1, endServer - startServer)
 
@@ -670,13 +627,11 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
 
   local serverDelta = endServer - NowServer()
   state.endLocal = GetTime() + serverDelta
-  local startDelta = startServer - NowServer()
-  state.startLocal = GetTime() + startDelta
 
-  ResetReminderFlags()
+  ResetFlags()
 
   Bar:Show()
-  UpdateBar(Remaining())
+  UpdateBar(RemainingPrecise())
 
   SetBigPoint()
   state.baseBigScale = db.big.scale or 1.6
@@ -690,18 +645,15 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
     Big:Hide()
   end
 
-  BigWarnLocal(FormatAnnounceLine("Break", state.reason, FormatTime(seconds)) .. " - called by " .. (state.caller ~= "" and state.caller or "?"))
+  BigWarnLocal("BREAK STARTED" .. (state.reason ~= "" and (": " .. state.reason) or ""))
   ShowBanner("BREAK STARTED", state.reason ~= "" and state.reason or "")
-
-  if (not silent) and ShouldAnnounceFor(seconds) then
-    DoAnnounce(FormatAnnounceLine("Break", state.reason, FormatTime(seconds)) .. (state.caller ~= "" and (" (" .. state.caller .. ")") or ""))
-  end
 
   StopTicker()
   state.ticker = C_Timer.NewTicker(0.05, function()
     if not state.running then return end
-    local rem = Remaining()
-    if rem <= 0 then
+
+    local remPrecise = RemainingPrecise()
+    if remPrecise <= 0 then
       state.running = false
       StopTicker()
       UpdateBar(0)
@@ -713,11 +665,6 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
       if db.big.enabled then FadeFrameTo(Big, 0, 0.20) end
 
       EdgePulseOff()
-
-      if ShouldAnnounceFor(seconds) then
-        DoAnnounce(FormatAnnounceLine("Break Over", state.reason, ""))
-      end
-
       C_Timer.After(1.0, function() TryReadyCheck() end)
 
       C_Timer.After(0.35, function()
@@ -731,19 +678,20 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
       return
     end
 
-    local whole = math.floor(rem + 0.5)
+    local whole = RemainingDisplaySeconds(remPrecise)
 
-    UpdateBar(rem)
-    UpdateBig(rem, whole)
+    UpdateBar(remPrecise)
+    UpdateBig(remPrecise, whole)
 
-    if db.edgePulse and rem <= 10 then
+    if db.edgePulse and remPrecise <= 10 then
       local a = 0.06 + 0.10 * (0.5 + 0.5 * math.sin(GetTime() * 10))
       EdgePulseTick(a)
     else
       EdgePulseOff()
     end
 
-    if rem <= 10 and not state.warned10 then
+    -- Trigger 10-second warning + /cd exactly when our display flips to 10.
+    if whole == 10 and not state.warned10 then
       state.warned10 = true
       FlashScreen()
       BigWarnLocal("Break ends in 10 seconds!")
@@ -751,7 +699,7 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
       Beep()
     end
 
-    if rem <= 10 and not state.cdStarted and GetGroupChannel() ~= nil then
+    if whole == 10 and not state.cdStarted and GetGroupChannel() ~= nil then
       if DoBlizzardCountdown10() then
         state.cdStarted = true
         SyncSend("COUNTDOWN;" .. tostring(state.startServer))
@@ -760,18 +708,11 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
       end
     end
 
-    if whole == 3 then Beep() end
-    if whole == 1 then Beep() end
-
-    if db.remind then
-      for _, t in ipairs({120, 60, 30, 10}) do
-        if rem <= t and not state.reminded[t] then
-          state.reminded[t] = true
-          if ShouldAnnounceFor(seconds) then
-            DoAnnounce(FormatAnnounceLine("Break", state.reason, FormatTime(rem)))
-          end
-        end
-      end
+    -- Beeps on integer transitions, not time slices.
+    if state.lastWhole ~= whole then
+      if whole == 3 then Beep() end
+      if whole == 1 then Beep() end
+      state.lastWhole = whole
     end
   end)
 
@@ -834,10 +775,6 @@ local function StopTimer(silent, fromSync, callerName)
   ShowBanner("BREAK CANCELED", who)
   BigWarnLocal("BREAK CANCELED! (" .. who .. ")")
 
-  if (not silent) and ShouldAnnounceFor(state.duration or 0) then
-    DoAnnounce(FormatAnnounceLine("Break Canceled", state.reason, "") .. " (" .. who .. ")")
-  end
-
   if grouped and not fromSync then
     SyncSend("STOP;" .. who)
   end
@@ -863,21 +800,18 @@ local function ExtendTimer(addSeconds, silent, fromSync, callerName)
   state.endLocal = GetTime() + (state.endServer - NowServer())
   state.duration = (state.endServer - state.startServer)
 
-  if Remaining() > 10 then
+  if RemainingPrecise() > 10 then
     state.cdStarted = false
   end
 
-  ResetReminderFlags()
+  state.warned10 = false
+  state.lastWhole = nil
 
-  local rem = Remaining()
-  ShowBanner("BREAK EXTENDED", "+" .. FormatTime(addSeconds) .. " (" .. FormatTime(rem) .. " left)")
+  local remPrecise = RemainingPrecise()
+  ShowBanner("BREAK EXTENDED", "+" .. FormatTimeFromSeconds(math.floor(addSeconds + 0.5)))
 
-  if (not silent) and ShouldAnnounceFor(state.duration or 0) then
-    DoAnnounce(FormatAnnounceLine("Break Extended", state.reason, "+" .. FormatTime(addSeconds)) .. " (" .. who .. ")")
-  end
-
-  UpdateBar(rem)
-  UpdateBig(rem, math.floor(rem + 0.5))
+  UpdateBar(remPrecise)
+  UpdateBig(remPrecise, RemainingDisplaySeconds(remPrecise))
 
   if grouped and not fromSync then
     SyncSend(string.format("EXTEND;%d;%s;%d;%d", math.floor(addSeconds + 0.5), who, state.startServer, state.endServer))
@@ -933,14 +867,13 @@ local function HandleSlash(msg)
       LocalPrint("No break timer running.")
       return
     end
-    local rem = Remaining()
+    local remPrecise = RemainingPrecise()
+    local remShow = RemainingDisplaySeconds(remPrecise)
     local who = state.caller ~= "" and state.caller or "?"
-    local auth = state.authority or 0
-    LocalPrint(string.format("Break running: %s remaining%s. Caller: %s. Authority: %d.",
-      FormatTime(rem),
+    LocalPrint(string.format("Break running: %s remaining%s. Caller: %s.",
+      FormatTimeFromSeconds(remShow),
       (state.reason ~= "" and (" (" .. state.reason .. ")") or ""),
-      who,
-      auth
+      who
     ))
     return
   end
@@ -1006,13 +939,13 @@ local function Major(v)
 end
 
 local function SendHello()
-  if Throttled("Hello", 5.0) then return end
+  if Throttled("lastHello", 5.0) then return end
   if GetGroupChannel() == nil then return end
   SyncSend("HELLO;" .. ADDON_VERSION)
 end
 
 local function RequestState()
-  if Throttled("Request", 2.0) then return end
+  if Throttled("lastRequest", 2.0) then return end
   if GetGroupChannel() == nil then return end
   SyncSend("REQUEST;" .. ADDON_VERSION)
 end
@@ -1111,16 +1044,14 @@ local function OnAddonMessage(prefix, text, channel, sender)
       state.endLocal = GetTime() + (state.endServer - NowServer())
       state.duration = (state.endServer - state.startServer)
 
-      if Remaining() > 10 then
-        state.cdStarted = false
-      end
+      if RemainingPrecise() > 10 then state.cdStarted = false end
+      state.warned10 = false
+      state.lastWhole = nil
 
-      ResetReminderFlags()
-
-      local rem = Remaining()
-      ShowBanner("BREAK EXTENDED", "+" .. FormatTime(add) .. " (" .. FormatTime(rem) .. " left)")
-      UpdateBar(rem)
-      UpdateBig(rem, math.floor(rem + 0.5))
+      local remPrecise = RemainingPrecise()
+      ShowBanner("BREAK EXTENDED", "+" .. FormatTimeFromSeconds(add))
+      UpdateBar(remPrecise)
+      UpdateBig(remPrecise, RemainingDisplaySeconds(remPrecise))
     elseif (not state.running) and add > 0 then
       RequestState()
     end

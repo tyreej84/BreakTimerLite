@@ -1,8 +1,8 @@
 ## Interface: 120000
 ## Title: Break Timer Lite
-## Notes: Synced break timer (leader/assist only). Sleek timer bar + large countdown + banners. Blizzard countdown text at 10s remaining. Late-join sync, conflict handling, version handshake.
+## Notes: Synced break timer (leader/assist only). Sleek timer bar + large countdown + banners. Blizzard countdown text at 10s remaining. Late-join sync, conflict handling, version handshake. No chat spam.
 ## Author: Karnytine-Stormrage (joe@tyreenet.com)
-## Version: 1.1.8
+## Version: 1.2.0
 ## SavedVariables: BreakTimerDB
 
 Core.lua

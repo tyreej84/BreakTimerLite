@@ -4,6 +4,16 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.2.0] - 2026-01-28
+### Fixed
+- Perfectly aligned the on-bar countdown with Blizzard’s `/cd 10` display:
+  - Countdown text uses `ceil(remaining)` so it flips exactly on integer boundaries.
+  - The 10-second warning + Blizzard countdown now trigger when the display hits **10**, not early.
+
+### Changed
+- Removed all group chat announcements (no 2m/1m/30s/10s spam). Visuals/sounds only.
+
+
 ## [1.1.8] - 2026-01-28
 ### Fixed
 - Restored full timer functionality after a bad update (ticker/UI updates and text objects were missing).
