@@ -11,7 +11,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.1.2"
+local ADDON_VERSION = "1.1.3"
 
 local defaults = {
   width = 260,
@@ -336,6 +336,7 @@ end
 
 -- ------------------------------------------------------------
 -- UI: Sleek bar (translucent black container + flat blue fill + thin edge line)
+-- Fix: text is now ABOVE the fill (separate overlay frame with higher frame level)
 -- ------------------------------------------------------------
 local Bar = CreateFrame("Frame", "BreakTimerLiteBar", UIParent, "BackdropTemplate")
 Bar:Hide()
@@ -384,13 +385,25 @@ Glow:SetAllPoints(Bar)
 Glow:SetColorTexture(1, 0.2, 0.2, 0)
 Glow:Hide()
 
-local TextLeft = Bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+-- Text overlay frame: sits above StatusBar fill so it never gets hidden.
+local TextOverlay = CreateFrame("Frame", nil, Bar)
+TextOverlay:SetAllPoints(Bar)
+TextOverlay:SetFrameStrata(Bar:GetFrameStrata())
+TextOverlay:SetFrameLevel(Bar:GetFrameLevel() + 20)
+
+local TextLeft = TextOverlay:CreateFontString(nil, "OVERLAY")
 TextLeft:SetPoint("LEFT", 6, 0)
 TextLeft:SetJustifyH("LEFT")
+TextLeft:SetFont(STANDARD_TEXT_FONT, 12, "OUTLINE")  -- white outline
+TextLeft:SetTextColor(0, 0, 0, 1)                    -- black text
+TextLeft:SetShadowOffset(0, 0)
 
-local TextRight = Bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+local TextRight = TextOverlay:CreateFontString(nil, "OVERLAY")
 TextRight:SetPoint("RIGHT", -6, 0)
 TextRight:SetJustifyH("RIGHT")
+TextRight:SetFont(STANDARD_TEXT_FONT, 12, "OUTLINE") -- white outline
+TextRight:SetTextColor(0, 0, 0, 1)                   -- black text
+TextRight:SetShadowOffset(0, 0)
 
 local function SetBarSize()
   Bar:SetSize(db.width, db.height)
@@ -504,7 +517,7 @@ local state = {
   baseBigScale = 1.6,
   shakeSeed = 0,
 
-  cdStarted = false,   -- whether Blizzard /cd text has started for this break
+  cdStarted = false,
 }
 
 local function ResetReminderFlags()
@@ -539,7 +552,6 @@ local function BuildBarLeftText()
 end
 
 local function SetBarColor()
-  -- Sleek flat blue
   Status:SetStatusBarColor(0.15, 0.55, 1.00)
 end
 
@@ -727,7 +739,6 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
       EdgePulseOff()
     end
 
-    -- 10s warning (local)
     if rem <= 10 and not state.warned10 then
       state.warned10 = true
       FlashScreen()
@@ -736,13 +747,11 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
       Beep()
     end
 
-    -- Start Blizzard /cd-style countdown text at 10s remaining (once)
     if rem <= 10 and not state.cdStarted and GetGroupChannel() ~= nil then
       if DoBlizzardCountdown10() then
         state.cdStarted = true
         SyncSend("COUNTDOWN;" .. tostring(state.startServer))
       else
-        -- request leader/assist start it (handles leadership swaps)
         SyncSend("CDREQUEST;" .. tostring(state.startServer))
       end
     end
@@ -850,7 +859,6 @@ local function ExtendTimer(addSeconds, silent, fromSync, callerName)
   state.endLocal = GetTime() + (state.endServer - NowServer())
   state.duration = (state.endServer - state.startServer)
 
-  -- If the extension puts us above 10s again, allow the Blizzard countdown to fire later.
   if Remaining() > 10 then
     state.cdStarted = false
   end

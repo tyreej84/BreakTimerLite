@@ -4,6 +4,14 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.1.3] - 2026-01-28
+### Changed
+- Improved timer bar text readability:
+  - Timer text now renders **above** the progress fill so it never disappears as the bar counts down
+  - Countdown time and label text switched to **black text with a white outline** for stronger contrast
+
+---
+
 ## [1.1.2] - 2026-01-28
 ### Added
 - Blizzard **/cd-style countdown text** now starts automatically at **10 seconds remaining**
