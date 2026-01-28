@@ -2,115 +2,128 @@
 
 A lightweight, synced break timer addon for World of Warcraft.
 
-**Break Timer Lite** is designed to feel like a polished, purpose-built break timer: one person starts it, everyone with the addon sees the same timer, and it automatically triggers Blizzard’s built-in 10-second countdown text/sound at the end — without spamming group chat.
+**Break Timer Lite** is designed to feel like a polished, purpose-built break timer: one person starts it, everyone with the addon sees the same timer, and it automatically triggers Blizzard’s built-in 10-second countdown **and a Ready Check** at the end — without spamming group chat.
+
+---
 
 ## Features
 
-* **Synced timers** across the party/raid via addon communication
-* **Leader/assist control**
+- **Synced timers** across the party/raid via addon communication
+- **Leader/assist control**
+  - In parties: **Party Leader** can start/extend/stop
+  - In raids: **Raid Leader or Assistant** can start/extend/stop
+- **No chat spam**
+  - Break Timer Lite sends **no PARTY / RAID / INSTANCE chat messages**
+  - All notifications are **local-only** (screen banners, Raid Warning frame, sounds)
+- **Sleek timer bar**
+  - Translucent black container with a blue progress fill
+  - **White text** for maximum readability
+- **Big countdown (optional)**
+  - Large center-screen countdown with last-seconds polish
+- **Blizzard countdown at 10 seconds**
+  - At **10 seconds remaining**, the addon triggers Blizzard’s built-in countdown (`/cd 10`)
+- **Automatic Ready Check**
+  - When the break completes, the addon **automatically starts a Ready Check**
+  - Requires **Party Leader / Raid Leader / Raid Assistant**
+  - Can be toggled on or off in the options
+- **Late-join sync**
+  - Players joining mid-break will automatically sync and see the correct remaining time
+- **Conflict handling**
+  - If multiple breaks are started, the timer from the **highest authority** wins
 
-  * In parties: **Party Leader** can start/extend/stop
-  * In raids: **Raid Leader or Assistant** can start/extend/stop
-  * Following break does ready check.
-* **No chat spam**
-
-  * Break Timer Lite sends **no PARTY/RAID/INSTANCE chat messages** at any time
-  * Notifications are **local-only** (screen banners / RaidWarning frame / sounds)
-* **Sleek timer bar**
-
-  * Translucent black bar with a blue countdown fill
-  * **White text** for clear visibility at all times
-* **Big countdown (optional)**
-
-  * Large center-screen countdown with “last 10 seconds” polish
-* **Blizzard countdown at 10 seconds**
-
-  * At **10 seconds remaining**, the addon triggers Blizzard’s built-in countdown (`/cd 10`) so everyone sees the official countdown text
-  * Also plays local warning sounds at 10 seconds and at timer end
-* **Late-join sync**
-
-  * Players who join mid-break will request state and see the correct remaining time
-* **Conflict handling**
-
-  * If multiple timers are started, the addon prefers the **higher-authority** starter (leader > assist > member), otherwise the newest start
+---
 
 ## Commands
 
-Primary command:
+**Primary command:**
 
-* `/break [minutes] [reason]`
+/break [minutes] [reason]
 
-Examples:
+### Examples
 
-* `/break`
-  Starts a break using the configured default duration (default: 5 minutes)
+/break  
+Starts a break using the configured default duration (default: 5 minutes)
 
-* `/break 10`
-  Starts a 10-minute break
+/break 10  
+Starts a 10-minute break
 
-* `/break 7 bio`
-  Starts a 7-minute break with the reason “bio”
+/break 7 bio  
+Starts a 7-minute break with the reason “bio”
 
-Extend / stop:
+### Extend / Stop
 
-* `/break +2`
-  Extends the current break by 2 minutes (or starts a 2-minute break if none running)
+/break +2  
+Extends the current break by 2 minutes  
+(or starts a 2-minute break if none is running)
 
-* `/break extend 3`
-  Extends the current break by 3 minutes
+/break extend 3  
+Extends the current break by 3 minutes
 
-* `/break stop`
-  Cancels the current break
+/break stop  
+Cancels the current break
 
-Status / options:
+### Status / Options
 
-* `/break status`
-  Prints the current break status to your chat frame (local)
+/break status  
+Prints the current break status (local only)
 
-* `/break options`
-  Opens the addon options panel
+/break options  
+Opens the addon options panel
 
-Aliases:
+### Aliases
 
-* `/breaktimer`
-* `/breaktime`
-* `/bt`
+- /breaktimer
+- /breaktime
+- /bt
+
+---
 
 ## Options
 
 Open options via:
 
-* **Esc → Options → AddOns → Break Timer Lite**
-* Or: `/break options`
+- **Esc → Options → AddOns → Break Timer Lite**
+- Or via: `/break options`
 
 Available options include:
 
-* Toggle **local Raid Warning** display
-* Toggle **warning sounds** and short beeps
-* Toggle **ready check on end** (leader/assist only)
-* Adjust **bar width/height**
-* Toggle **big countdown** + scale
-* Toggle banner visuals
-* Configure default `/break` minutes
+- Toggle **local Raid Warning** messages
+- Toggle **warning sounds** and short beeps
+- Toggle **automatic Ready Check on break completion**
+- Adjust **bar width and height**
+- Enable/disable **big countdown** and adjust its scale
+- Enable/disable **banner notifications**
+- Configure default `/break` duration
 
-### Moving the UI
+---
 
-* Hold **ALT** and drag the **timer bar** to reposition
-* Hold **ALT** and drag the **big countdown** to reposition
+## Moving the UI
+
+- Hold **ALT** and drag the **timer bar** to reposition it
+- Hold **ALT** and drag the **big countdown** to reposition it
+
+---
 
 ## Installation
 
-1. Download/clone this repository
+1. Download or clone this repository
 2. Copy the folder `BreakTimerLite` into:
 
-   * `World of Warcraft/_retail_/Interface/AddOns/`
+World of Warcraft/_retail_/Interface/AddOns/
+
 3. Restart WoW or run `/reload`
 
-## Compatibility Notes
+---
 
-* **Blizzard countdown (/cd 10)** requires being in a group and requires **leader/assist** to trigger (Blizzard restriction).
-* If someone in your group is running an older version of this addon, they may still produce chat spam on their client. Updating everyone removes that.
+## Notes
+
+- Blizzard’s countdown text (`/cd 10`) and the **Ready Check** both require:
+  - Being in a party or raid
+  - Having leader or assist permissions
+
+---
 
 ## License
 
-This project is licensed under the MIT License — see `LICENSE.md`.
+This project is licensed under the **MIT License**.  
+See `LICENSE.md` for details.
