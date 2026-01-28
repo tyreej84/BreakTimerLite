@@ -11,6 +11,7 @@ A lightweight, synced break timer addon for World of Warcraft.
 
   * In parties: **Party Leader** can start/extend/stop
   * In raids: **Raid Leader or Assistant** can start/extend/stop
+  * Following break does ready check.
 * **No chat spam**
 
   * Break Timer Lite sends **no PARTY/RAID/INSTANCE chat messages** at any time
