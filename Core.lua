@@ -8,29 +8,10 @@
 --   /break options
 -- Aliases:
 --   /breaktimer /breaktime /bt
---
--- Sync is always enabled:
---   - Only leader/assist can start/stop/extend while grouped
---   - Everyone with the addon sees the same bar + big timer
---   - Late-join sync (REQUEST/STATE), conflict handling, version handshake
---
--- Blizzard countdown:
---   - On break start, leader/assist runs C_PartyInfo.DoCountdown(10)
--- Cancel (best effort):
---   - C_PartyInfo.CancelCountdown() if available, else C_PartyInfo.DoCountdown(0)
---
--- Visual polish:
---   - Minimap button + quick menu
---   - Big center timer: fade in/out, pulse last 10, shake+flash last 5
---   - Center banner animation on start/extend/stop/end
---   - Bar spark + last-10 glow
---   - Screen-edge pulse last 10
--- Audio:
---   - Optional beeps at 10/3/1 using built-in sound kits
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.0.8"
+local ADDON_VERSION = "1.0.9"
 
 local defaults = {
   width = 260,
@@ -43,13 +24,13 @@ local defaults = {
 
   announce = true,
   raidWarning = true,
-  sound = true,               -- extra raid warning at 10 + end
+  sound = true,
   remind = true,
   label = "Break",
 
-  beeps = true,               -- 10/3/1 beeps
-  edgePulse = true,           -- screen-edge pulse last 10
-  readyCheckOnEnd = true,     -- ready check at end (leader/assist only)
+  beeps = true,
+  edgePulse = true,
+  readyCheckOnEnd = true,
 
   minimap = {
     hide = false,
@@ -118,7 +99,7 @@ end
 -- ------------------------------------------------------------
 local function IsPrivilegedLocal()
   if not IsInGroup() and not IsInRaid() and not IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then
-    return true -- solo
+    return true
   end
   if IsInRaid() then
     return UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")
@@ -185,10 +166,9 @@ local function CanRaidWarn()
 end
 
 -- ------------------------------------------------------------
--- Announcement formatting (clean + consistent)
+-- Announcement formatting
 -- ------------------------------------------------------------
 local function FormatAnnounceLine(title, reason, timeStr)
-  -- *** Break (Bio) - 5:00 ***
   local t = title or "Break"
   local r = reason and reason ~= "" and (" (" .. reason .. ")") or ""
   local s = timeStr and timeStr ~= "" and (" - " .. timeStr) or ""
@@ -198,12 +178,7 @@ end
 -- ------------------------------------------------------------
 -- Throttle
 -- ------------------------------------------------------------
-local throttle = {
-  lastSync = 0,
-  lastAnnounce = 0,
-  lastRequest = 0,
-  lastHello = 0,
-}
+local throttle = { lastSync = 0, lastAnnounce = 0, lastRequest = 0, lastHello = 0 }
 local function Throttled(kind, window)
   window = window or 0.6
   local t = GetTime()
@@ -309,7 +284,7 @@ local function EdgePulseOff()
 end
 
 -- ------------------------------------------------------------
--- Banner (center-screen)
+-- Banner
 -- ------------------------------------------------------------
 local Banner = CreateFrame("Frame", "BreakTimerLiteBanner", UIParent, "BackdropTemplate")
 Banner:Hide()
@@ -339,20 +314,12 @@ Banner.sub:SetShadowOffset(2, -2)
 Banner.sub:SetShadowColor(0, 0, 0, 1)
 
 Banner.ag = Banner:CreateAnimationGroup()
-local aIn = Banner.ag:CreateAnimation("Alpha")
-aIn:SetFromAlpha(0); aIn:SetToAlpha(1); aIn:SetDuration(0.14); aIn:SetOrder(1)
-local tIn = Banner.ag:CreateAnimation("Translation")
-tIn:SetOffset(0, -18); tIn:SetDuration(0.14); tIn:SetOrder(1)
-local hold = Banner.ag:CreateAnimation("Alpha")
-hold:SetFromAlpha(1); hold:SetToAlpha(1); hold:SetDuration(1.05); hold:SetOrder(2)
-local aOut = Banner.ag:CreateAnimation("Alpha")
-aOut:SetFromAlpha(1); aOut:SetToAlpha(0); aOut:SetDuration(0.22); aOut:SetOrder(3)
-local tOut = Banner.ag:CreateAnimation("Translation")
-tOut:SetOffset(0, 18); tOut:SetDuration(0.22); tOut:SetOrder(3)
-Banner.ag:SetScript("OnFinished", function()
-  Banner:Hide()
-  Banner:SetAlpha(0)
-end)
+local aIn = Banner.ag:CreateAnimation("Alpha"); aIn:SetFromAlpha(0); aIn:SetToAlpha(1); aIn:SetDuration(0.14); aIn:SetOrder(1)
+local tIn = Banner.ag:CreateAnimation("Translation"); tIn:SetOffset(0, -18); tIn:SetDuration(0.14); tIn:SetOrder(1)
+local hold = Banner.ag:CreateAnimation("Alpha"); hold:SetFromAlpha(1); hold:SetToAlpha(1); hold:SetDuration(1.05); hold:SetOrder(2)
+local aOut = Banner.ag:CreateAnimation("Alpha"); aOut:SetFromAlpha(1); aOut:SetToAlpha(0); aOut:SetDuration(0.22); aOut:SetOrder(3)
+local tOut = Banner.ag:CreateAnimation("Translation"); tOut:SetOffset(0, 18); tOut:SetDuration(0.22); tOut:SetOrder(3)
+Banner.ag:SetScript("OnFinished", function() Banner:Hide(); Banner:SetAlpha(0) end)
 
 local function ShowBanner(mainText, subText)
   if not db.banner.enabled then return end
@@ -371,7 +338,7 @@ local function ShowBanner(mainText, subText)
 end
 
 -- ------------------------------------------------------------
--- UI: Timer bar (spark + last-10 glow)
+-- UI: Timer bar (spark + glow)
 -- ------------------------------------------------------------
 local Bar = CreateFrame("Frame", "BreakTimerLiteBar", UIParent, "BackdropTemplate")
 Bar:Hide()
@@ -379,9 +346,7 @@ Bar:SetClampedToScreen(true)
 Bar:SetMovable(true)
 Bar:EnableMouse(true)
 Bar:RegisterForDrag("LeftButton")
-Bar:SetScript("OnDragStart", function(self)
-  if IsAltKeyDown() then self:StartMoving() end
-end)
+Bar:SetScript("OnDragStart", function(self) if IsAltKeyDown() then self:StartMoving() end end)
 Bar:SetScript("OnDragStop", function(self)
   self:StopMovingOrSizing()
   local p, rel, rp, x, y = self:GetPoint(1)
@@ -406,8 +371,9 @@ Status:SetValue(1)
 local Spark = Status:CreateTexture(nil, "OVERLAY")
 Spark:SetTexture("Interface\\CastingBar\\UI-CastingBar-Spark")
 Spark:SetBlendMode("ADD")
-Spark:SetSize(18, db.height + 10)
 Spark:SetAlpha(0.9)
+-- IMPORTANT: don't use db here (db is nil until ADDON_LOADED)
+Spark:SetSize(18, (defaults.height or 18) + 10)
 
 local Glow = Bar:CreateTexture(nil, "OVERLAY")
 Glow:SetAllPoints(Bar)
@@ -435,7 +401,7 @@ local function SetBarPoint()
 end
 
 -- ------------------------------------------------------------
--- UI: Big center timer
+-- UI: Big center timer (unchanged)
 -- ------------------------------------------------------------
 local Big = CreateFrame("Frame", "BreakTimerLiteBigFrame", UIParent)
 Big:Hide()
@@ -443,15 +409,12 @@ Big:SetClampedToScreen(true)
 Big:SetMovable(true)
 Big:EnableMouse(true)
 Big:RegisterForDrag("LeftButton")
-Big:SetScript("OnDragStart", function(self)
-  if IsAltKeyDown() then self:StartMoving() end
-end)
+Big:SetScript("OnDragStart", function(self) if IsAltKeyDown() then self:StartMoving() end end)
 Big:SetScript("OnDragStop", function(self)
   self:StopMovingOrSizing()
   local p, rel, rp, x, y = self:GetPoint(1)
   db.big.point = { p, rel:GetName(), rp, x, y }
 end)
-
 Big:SetAlpha(0)
 
 Big.header = Big:CreateFontString(nil, "OVERLAY")
@@ -494,12 +457,8 @@ end
 local function BigFlashPulse()
   Big.flash:Show()
   Big.flash:SetAlpha(0.35)
-  C_Timer.After(0.06, function()
-    if Big and Big.flash then Big.flash:SetAlpha(0) end
-  end)
-  C_Timer.After(0.10, function()
-    if Big and Big.flash then Big.flash:Hide() end
-  end)
+  C_Timer.After(0.06, function() if Big and Big.flash then Big.flash:SetAlpha(0) end end)
+  C_Timer.After(0.10, function() if Big and Big.flash then Big.flash:Hide() end end)
 end
 
 local function FadeFrameTo(frame, targetAlpha, duration)
@@ -520,11 +479,10 @@ local function FadeFrameTo(frame, targetAlpha, duration)
 end
 
 -- ------------------------------------------------------------
--- Timer state (server-time based)
+-- Timer state
 -- ------------------------------------------------------------
 local state = {
   running = false,
-
   startServer = 0,
   endServer = 0,
   startLocal = 0,
@@ -536,10 +494,8 @@ local state = {
   authority = 0,
 
   ticker = nil,
-
   warned10 = false,
   reminded = {},
-
   lastWhole = nil,
   baseBigScale = 1.6,
   shakeSeed = 0,
@@ -553,28 +509,18 @@ local function ResetReminderFlags()
 end
 
 local function StopTicker()
-  if state.ticker then
-    state.ticker:Cancel()
-    state.ticker = nil
-  end
+  if state.ticker then state.ticker:Cancel(); state.ticker = nil end
 end
 
 local function Remaining()
   return state.endLocal - GetTime()
 end
 
--- ------------------------------------------------------------
--- Beeps (built-in sound kits)
--- ------------------------------------------------------------
-local function Beep(kind)
+local function Beep()
   if not db.beeps then return end
-  -- Keep it simple + built-in.
   PlaySound(SOUNDKIT.UI_IG_MAINMENU_OPTION_CHECKBOX_ON, "Master")
 end
 
--- ------------------------------------------------------------
--- Bar/BIG updates
--- ------------------------------------------------------------
 local function SetBarColorByRemaining(rem)
   if rem <= 10 then
     Status:SetStatusBarColor(1, 0.15, 0.15)
@@ -666,36 +612,23 @@ local function UpdateBig(rem, whole)
   end
 
   if db.big.flashLast5 and whole and whole <= 5 and whole >= 1 then
-    if state.lastWhole ~= whole then
-      BigFlashPulse()
-    end
+    if state.lastWhole ~= whole then BigFlashPulse() end
   end
 
   state.lastWhole = whole
 end
 
--- ------------------------------------------------------------
--- Smart announce
--- ------------------------------------------------------------
 local function ShouldAnnounceFor(seconds)
   if not db.smartAnnounce then return true end
   return seconds >= (db.smartAnnounceMinSeconds or 30)
 end
 
--- ------------------------------------------------------------
--- Ready check
--- ------------------------------------------------------------
 local function TryReadyCheck()
   if not db.readyCheckOnEnd then return end
   if not IsPrivilegedLocal() then return end
-  if type(DoReadyCheck) == "function" then
-    DoReadyCheck()
-  end
+  if type(DoReadyCheck) == "function" then DoReadyCheck() end
 end
 
--- ------------------------------------------------------------
--- Conflict handling: accept remote timer?
--- ------------------------------------------------------------
 local function ShouldAcceptRemote(startServer, authorityRank)
   if not state.running then return true end
   if authorityRank > (state.authority or 0) then return true end
@@ -703,9 +636,6 @@ local function ShouldAcceptRemote(startServer, authorityRank)
   return startServer > (state.startServer or 0)
 end
 
--- ------------------------------------------------------------
--- Core actions
--- ------------------------------------------------------------
 local function StartTimerWithServerTimes(startServer, endServer, reason, caller, authority, silent, fromSync, startCountdownNow)
   local seconds = math.max(1, endServer - startServer)
 
@@ -762,12 +692,8 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
       FlashScreen()
       ShowBanner("BREAK OVER", state.reason ~= "" and state.reason or "")
       BigWarnLocal("BREAK OVER!")
-      if db.sound then
-        PlaySound(SOUNDKIT.RAID_WARNING, "Master")
-      end
-      if db.big.enabled then
-        FadeFrameTo(Big, 0, 0.20)
-      end
+      if db.sound then PlaySound(SOUNDKIT.RAID_WARNING, "Master") end
+      if db.big.enabled then FadeFrameTo(Big, 0, 0.20) end
 
       EdgePulseOff()
 
@@ -775,9 +701,7 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
         DoAnnounce(FormatAnnounceLine("Break Over", state.reason, ""))
       end
 
-      C_Timer.After(1.0, function()
-        TryReadyCheck()
-      end)
+      C_Timer.After(1.0, function() TryReadyCheck() end)
 
       C_Timer.After(0.35, function()
         if not state.running then
@@ -806,14 +730,12 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
       state.warned10 = true
       FlashScreen()
       BigWarnLocal("Break ends in 10 seconds!")
-      if db.sound then
-        PlaySound(SOUNDKIT.RAID_WARNING, "Master")
-      end
-      Beep(10)
+      if db.sound then PlaySound(SOUNDKIT.RAID_WARNING, "Master") end
+      Beep()
     end
 
-    if whole == 3 then Beep(3) end
-    if whole == 1 then Beep(1) end
+    if whole == 3 then Beep() end
+    if whole == 1 then Beep() end
 
     if db.remind then
       for _, t in ipairs({120, 60, 30, 10}) do
@@ -848,9 +770,7 @@ local function StartTimer(seconds, reason, silent, fromSync, callerName, startCo
   StartTimerWithServerTimes(startServer, endServer, reason or "", caller, auth, silent, fromSync, startCountdownNow)
 
   if grouped and not fromSync then
-    SyncSend(string.format("START;%d;%d;%s;%s;%d;%s",
-      startServer, endServer, reason or "", caller, auth, ADDON_VERSION
-    ))
+    SyncSend(string.format("START;%d;%d;%s;%s;%d;%s", startServer, endServer, reason or "", caller, auth, ADDON_VERSION))
   end
 
   return true
@@ -868,9 +788,7 @@ local function StopTimer(silent, fromSync, callerName)
     return
   end
 
-  if not fromSync then
-    CancelBlizzardCountdownBestEffort()
-  end
+  if not fromSync then CancelBlizzardCountdownBestEffort() end
 
   local who = (callerName and callerName ~= "" and callerName) or Ambiguate(UnitName("player") or "", "short")
 
@@ -880,9 +798,7 @@ local function StopTimer(silent, fromSync, callerName)
 
   if db.big.enabled then
     FadeFrameTo(Big, 0, 0.18)
-    C_Timer.After(0.22, function()
-      if not state.running then Big:Hide() end
-    end)
+    C_Timer.After(0.22, function() if not state.running then Big:Hide() end end)
   else
     Big:Hide()
   end
@@ -934,9 +850,7 @@ local function ExtendTimer(addSeconds, silent, fromSync, callerName)
   UpdateBig(rem, math.floor(rem + 0.5))
 
   if grouped and not fromSync then
-    SyncSend(string.format("EXTEND;%d;%s;%d;%d",
-      math.floor(addSeconds + 0.5), who, state.startServer, state.endServer
-    ))
+    SyncSend(string.format("EXTEND;%d;%s;%d;%d", math.floor(addSeconds + 0.5), who, state.startServer, state.endServer))
   end
 
   return true
@@ -998,10 +912,6 @@ local function HandleSlash(msg)
       who,
       auth
     ))
-    return
-  end
-  if first == "test" then
-    StartTimer(30, "Test", true, true, "You", false)
     return
   end
 
@@ -1161,7 +1071,6 @@ local function OnAddonMessage(prefix, text, channel, sender)
   if action == "EXTEND" then
     if auth < 2 then return end
     local add = tonumber(a or 0) or 0
-    local who = b or senderShort
     local startServer = tonumber(c or 0) or 0
     local endServer = tonumber(d or 0) or 0
 
@@ -1184,7 +1093,7 @@ local function OnAddonMessage(prefix, text, channel, sender)
 end
 
 -- ------------------------------------------------------------
--- Minimap button (no libs)
+-- Minimap button (unchanged from prior)
 -- ------------------------------------------------------------
 local MinimapButton
 
@@ -1249,9 +1158,7 @@ local function MinimapButton_Create()
       MinimapButton_Reposition()
     end)
   end)
-  b:SetScript("OnDragStop", function(self)
-    self:SetScript("OnUpdate", nil)
-  end)
+  b:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
 
   local menu = CreateFrame("Frame", "BreakTimerLiteMinimapMenu", UIParent, "UIDropDownMenuTemplate")
   local function Menu_Start(mins) StartTimer(mins * 60, "", false, false, Ambiguate(UnitName("player") or "", "short"), true) end
@@ -1333,9 +1240,7 @@ f:SetScript("OnEvent", function(self, event, ...)
   elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
     if GetGroupChannel() ~= nil then
       SendHello()
-      if not state.running then
-        RequestState()
-      end
+      if not state.running then RequestState() end
     end
   end
 end)
