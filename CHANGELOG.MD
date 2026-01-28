@@ -4,6 +4,13 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.2.1] - 2026-01-28
+### Changed
+- **Completely removed all chat output** (no PARTY/RAID/INSTANCE chat announcements at any time).
+- Added a safety block to prevent legacy-style break reminder messages (e.g. `*** Break - 2:00 ***`) from being sent.
+
+---
+
 ## [1.2.0] - 2026-01-28
 ### Fixed
 - Perfectly aligned the on-bar countdown with Blizzard’s `/cd 10` display:
@@ -11,7 +18,14 @@ All notable changes to **Break Timer Lite** are documented in this file.
   - The 10-second warning + Blizzard countdown now trigger when the display hits **10**, not early.
 
 ### Changed
+- Removed group chat announcements for break reminders (visuals/sounds only).
+
+---
+
+## [1.1.9] - 2026-01-28
+### Changed
 - Removed all group chat announcements (no 2m/1m/30s/10s spam). Visuals/sounds only.
+
 
 
 ## [1.1.8] - 2026-01-28

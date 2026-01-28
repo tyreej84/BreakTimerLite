@@ -1,5 +1,5 @@
 -- Break Timer Lite - Options.lua
--- Simple, clean options panel (no chat announce options; visuals/sounds only)
+-- No chat options: this addon never sends group/raid chat messages.
 
 local ADDON, ns = ...
 local PANEL_NAME = "Break Timer Lite"
@@ -7,6 +7,17 @@ local PANEL_NAME = "Break Timer Lite"
 local function GetDB()
   return (ns and ns.GetDB and ns.GetDB()) or BreakTimerDB
 end
+
+local function OpenBlizzOptionsToMe()
+  if Settings and Settings.OpenToCategory then
+    Settings.OpenToCategory(PANEL_NAME)
+  else
+    InterfaceOptionsFrame_OpenToCategory(PANEL_NAME)
+    InterfaceOptionsFrame_OpenToCategory(PANEL_NAME)
+  end
+end
+
+ns.OpenOptions = OpenBlizzOptionsToMe
 
 local function MakeTitle(parent, text)
   local fs = parent:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
@@ -18,7 +29,7 @@ end
 local function MakeSubText(parent, anchor, text)
   local fs = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
   fs:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -8)
-  fs:SetWidth(600)
+  fs:SetWidth(640)
   fs:SetJustifyH("LEFT")
   fs:SetText(text)
   return fs
@@ -37,15 +48,8 @@ local function MakeCheck(parent, anchor, label, tooltip, getter, setter)
   cb.Text:SetText(label)
   cb.tooltipText = tooltip
 
-  cb:SetScript("OnShow", function(self)
-    self:SetChecked(getter())
-  end)
-
-  cb:SetScript("OnClick", function(self)
-    local v = self:GetChecked() and true or false
-    setter(v)
-  end)
-
+  cb:SetScript("OnShow", function(self) self:SetChecked(getter()) end)
+  cb:SetScript("OnClick", function(self) setter(self:GetChecked() and true or false) end)
   return cb
 end
 
@@ -56,17 +60,13 @@ local function MakeSlider(parent, anchor, label, tooltip, minv, maxv, step, gett
   s:SetMinMaxValues(minv, maxv)
   s:SetValueStep(step)
   s:SetObeyStepOnDrag(true)
-  s:SetOrientation("HORIZONTAL")
   s.tooltipText = tooltip
 
   _G[s:GetName() .. "Text"]:SetText(label)
   _G[s:GetName() .. "Low"]:SetText(tostring(minv))
   _G[s:GetName() .. "High"]:SetText(tostring(maxv))
 
-  s:SetScript("OnShow", function(self)
-    self:SetValue(getter())
-  end)
-
+  s:SetScript("OnShow", function(self) self:SetValue(getter()) end)
   s:SetScript("OnValueChanged", function(self, value)
     value = math.floor((value / step) + 0.5) * step
     setter(value)
@@ -75,29 +75,14 @@ local function MakeSlider(parent, anchor, label, tooltip, minv, maxv, step, gett
   return s
 end
 
-local function OpenBlizzOptionsToMe()
-  if Settings and Settings.OpenToCategory then
-    Settings.OpenToCategory(PANEL_NAME)
-  else
-    InterfaceOptionsFrame_OpenToCategory(PANEL_NAME)
-    InterfaceOptionsFrame_OpenToCategory(PANEL_NAME)
-  end
-end
-
--- Expose for Core.lua slash handler
-ns.OpenOptions = OpenBlizzOptionsToMe
-
--- ------------------------------------------------------------
--- Panel
--- ------------------------------------------------------------
 local panel = CreateFrame("Frame", nil, UIParent)
 panel.name = PANEL_NAME
 
 local title = MakeTitle(panel, PANEL_NAME)
 local sub = MakeSubText(panel, title,
-  "A synced break timer replacement.\n" ..
+  "Synced break timer replacement.\n" ..
   "• Only leader/raid assist can start/extend/stop while grouped.\n" ..
-  "• No chat spam: all notifications are local only.\n" ..
+  "• This addon sends NO group/raid chat messages.\n" ..
   "Tip: Hold ALT and drag the bar or big timer to reposition."
 )
 
@@ -105,7 +90,7 @@ local headerGeneral = MakeHeader(panel, sub, "General")
 
 local cbRaidWarn = MakeCheck(panel, headerGeneral,
   "Show local Raid Warning messages",
-  "Shows messages in the Raid Warning frame on your screen (does not send chat).",
+  "Shows messages in the Raid Warning frame on your screen (local only; not chat).",
   function() return GetDB().raidWarning end,
   function(v) GetDB().raidWarning = v end
 )
@@ -168,9 +153,7 @@ local cbBigEnabled = MakeCheck(panel, headerBig,
   "Enable big countdown",
   "Shows a large countdown timer near the center of your screen.",
   function() return GetDB().big.enabled end,
-  function(v)
-    GetDB().big.enabled = v
-  end
+  function(v) GetDB().big.enabled = v end
 )
 
 local sBigScale = MakeSlider(panel, cbBigEnabled,
@@ -209,7 +192,7 @@ local headerBanner = MakeHeader(panel, cbBigFlash, "Banners")
 
 local cbBanner = MakeCheck(panel, headerBanner,
   "Enable banners",
-  "Shows large banners on start/extend/end/cancel.",
+  "Shows large banners on start/extend/end/cancel (local only).",
   function() return GetDB().banner.enabled end,
   function(v) GetDB().banner.enabled = v end
 )
@@ -224,11 +207,7 @@ local sDefault = MakeSlider(panel, headerDefaults,
   function(v) GetDB().defaultMinutes = v end
 )
 
--- ------------------------------------------------------------
--- Panel lifecycle
--- ------------------------------------------------------------
 panel:SetScript("OnShow", function()
-  -- refresh visible controls
   cbRaidWarn:GetScript("OnShow")(cbRaidWarn)
   cbSound:GetScript("OnShow")(cbSound)
   cbBeeps:GetScript("OnShow")(cbBeeps)

@@ -1,5 +1,5 @@
 -- Break Timer Lite - Core.lua
--- No group/raid chat spam (local-only visuals/sounds), but still syncs timers.
+-- v1.2.1 - NO CHAT OUTPUT EVER (no PARTY/RAID/INSTANCE_CHAT spam)
 -- Commands:
 --   /break [minutes] [reason]
 --   /break +<minutes>
@@ -12,7 +12,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.2.0"
+local ADDON_VERSION = "1.2.1"
 
 local defaults = {
   width = 260,
@@ -21,9 +21,11 @@ local defaults = {
 
   defaultMinutes = 5,
 
-  -- chat output disabled (kept for compatibility; ignored)
+  -- legacy flags (ignored)
   announce = false,
-  raidWarning = true,   -- local raid warning frame only
+
+  -- local-only screen messages (NOT chat)
+  raidWarning = true,
 
   sound = true,
   label = "Break",
@@ -60,6 +62,32 @@ local function CopyDefaults(src, dst)
 end
 
 -- ------------------------------------------------------------
+-- HARD: Block chat spam from this addon
+-- ------------------------------------------------------------
+local function InstallNoChatShim()
+  -- If any leftover/old path tries to chat spam, block it when it matches our break reminder pattern.
+  -- We DO NOT globally block chat, only messages matching typical break reminder text.
+  local orig = SendChatMessage
+  if type(orig) ~= "function" then return end
+
+  SendChatMessage = function(msg, chatType, language, channel)
+    -- Common spam strings we never want:
+    -- "*** Break - 2:00 ***", "*** Break - 1:00 ***", etc.
+    if type(msg) == "string" then
+      -- Match both "*** Break - 2:00 ***" and variations.
+      if msg:find("%*%*%*") and msg:lower():find("break") and msg:find("%d+:%d%d") then
+        return
+      end
+      -- Also block very simple "Break - 2:00" just in case.
+      if msg:lower():match("^%s*break%s*%-%s*%d+:%d%d%s*$") then
+        return
+      end
+    end
+    return orig(msg, chatType, language, channel)
+  end
+end
+
+-- ------------------------------------------------------------
 -- Helpers
 -- ------------------------------------------------------------
 local function NowServer()
@@ -78,6 +106,7 @@ local function LocalPrint(msg)
   print("|cffffd100Break Timer Lite|r: " .. msg)
 end
 
+-- Local overlay message only (NOT chat, NOT raid warning send)
 local function BigWarnLocal(msg)
   if not db.raidWarning then return end
   RaidNotice_AddMessage(RaidWarningFrame, msg, ChatTypeInfo["RAID_WARNING"])
@@ -170,7 +199,7 @@ local function Throttled(key, window)
 end
 
 -- ------------------------------------------------------------
--- Addon Sync send
+-- Addon Sync send (addon messages only, NOT chat)
 -- ------------------------------------------------------------
 local function SyncSend(payload)
   local ch = GetGroupChannel()
@@ -690,7 +719,6 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
       EdgePulseOff()
     end
 
-    -- Trigger 10-second warning + /cd exactly when our display flips to 10.
     if whole == 10 and not state.warned10 then
       state.warned10 = true
       FlashScreen()
@@ -708,7 +736,6 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
       end
     end
 
-    -- Beeps on integer transitions, not time slices.
     if state.lastWhole ~= whole then
       if whole == 3 then Beep() end
       if whole == 1 then Beep() end
@@ -918,26 +945,6 @@ SlashCmdList["BREAKTIMERLITE"] = HandleSlash
 -- ------------------------------------------------------------
 -- Version handshake + late-join sync + countdown request/confirm
 -- ------------------------------------------------------------
-local knownVersions = {}
-
-local function CompareVersions(a, b)
-  local function parts(v)
-    local x,y,z = v:match("^(%d+)%.(%d+)%.(%d+)$")
-    return tonumber(x or 0), tonumber(y or 0), tonumber(z or 0)
-  end
-  local ax,ay,az = parts(a or "0.0.0")
-  local bx,by,bz = parts(b or "0.0.0")
-  if ax ~= bx then return ax < bx and -1 or 1 end
-  if ay ~= by then return ay < by and -1 or 1 end
-  if az ~= bz then return az < bz and -1 or 1 end
-  return 0
-end
-
-local function Major(v)
-  local x = v and v:match("^(%d+)%.") or "0"
-  return tonumber(x) or 0
-end
-
 local function SendHello()
   if Throttled("lastHello", 5.0) then return end
   if GetGroupChannel() == nil then return end
@@ -968,16 +975,12 @@ local function OnAddonMessage(prefix, text, channel, sender)
 
   local action, a, b, c, d, e, f, g = strsplit(";", text)
 
+  -- Ignore any legacy reminder messages from older versions
+  if action == "REMIND" or action == "WARNING" or action == "ANNOUNCE" then
+    return
+  end
+
   if action == "HELLO" then
-    local ver = a or "0.0.0"
-    knownVersions[senderShort] = ver
-    if Major(ver) ~= Major(ADDON_VERSION) then
-      LocalPrint("Version mismatch with " .. senderShort .. ": " .. ver .. " (you: " .. ADDON_VERSION .. ")")
-    else
-      if CompareVersions(ver, ADDON_VERSION) < 0 then
-        LocalPrint(senderShort .. " is running older version: " .. ver)
-      end
-    end
     return
   end
 
@@ -995,9 +998,7 @@ local function OnAddonMessage(prefix, text, channel, sender)
     local reason = c or ""
     local caller = d or senderShort
     local authority = tonumber(e or auth) or auth
-    local ver = f or "0.0.0"
     local cdFlag = tonumber(g or 0) or 0
-    knownVersions[senderShort] = ver
 
     if startServer > 0 and endServer > startServer then
       if ShouldAcceptRemote(startServer, authority) then
@@ -1022,8 +1023,6 @@ local function OnAddonMessage(prefix, text, channel, sender)
     local reason = c or ""
     local caller = d or senderShort
     local authority = tonumber(e or auth) or auth
-    local ver = f or "0.0.0"
-    knownVersions[senderShort] = ver
 
     if startServer > 0 and endServer > startServer then
       if ShouldAcceptRemote(startServer, authority) then
@@ -1095,6 +1094,12 @@ f:SetScript("OnEvent", function(self, event, ...)
 
     BreakTimerDB = CopyDefaults(defaults, BreakTimerDB)
     db = BreakTimerDB
+
+    -- Force legacy flags off
+    db.announce = false
+
+    -- Install anti-chat shim
+    InstallNoChatShim()
 
     SetBarSize()
     SetBarPoint()
