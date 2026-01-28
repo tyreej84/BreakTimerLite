@@ -1,108 +1,115 @@
 # Break Timer Lite
 
-**Break Timer Lite** is a lightweight, fully synced break timer addon for World of Warcraft.
+A lightweight, synced break timer addon for World of Warcraft.
 
-It provides a clear, authoritative break timer for groups and raids with strong visuals, synced state, and built-in Blizzard countdown support.
+**Break Timer Lite** is designed to feel like a polished, purpose-built break timer: one person starts it, everyone with the addon sees the same timer, and it automatically triggers Blizzard’s built-in 10-second countdown text/sound at the end — without spamming group chat.
 
----
+## Features
 
-## What it does
-- **Synced break timer** for the entire group (addon sync is always on)
-- **Only leader/assist can start, stop, or extend** while grouped
-- Clear **timer bar + large center countdown**
-- Center-screen banners for start, extend, end, and cancel
-- Uses **Blizzard’s built-in countdown**, started at **10 seconds**
-  - Blizzard audio typically plays from **5 → 1**
+* **Synced timers** across the party/raid via addon communication
+* **Leader/assist control**
 
----
+  * In parties: **Party Leader** can start/extend/stop
+  * In raids: **Raid Leader or Assistant** can start/extend/stop
+* **No chat spam**
+
+  * Break Timer Lite sends **no PARTY/RAID/INSTANCE chat messages** at any time
+  * Notifications are **local-only** (screen banners / RaidWarning frame / sounds)
+* **Sleek timer bar**
+
+  * Translucent black bar with a blue countdown fill
+  * **White text** for clear visibility at all times
+* **Big countdown (optional)**
+
+  * Large center-screen countdown with “last 10 seconds” polish
+* **Blizzard countdown at 10 seconds**
+
+  * At **10 seconds remaining**, the addon triggers Blizzard’s built-in countdown (`/cd 10`) so everyone sees the official countdown text
+  * Also plays local warning sounds at 10 seconds and at timer end
+* **Late-join sync**
+
+  * Players who join mid-break will request state and see the correct remaining time
+* **Conflict handling**
+
+  * If multiple timers are started, the addon prefers the **higher-authority** starter (leader > assist > member), otherwise the newest start
 
 ## Commands
 
-Primary:
-- `/break [minutes] [reason]`
-  - If no arguments are provided, starts the configured default duration
-- `/break +<minutes>` — extend the current break
-- `/break extend <minutes>` — extend the current break
-- `/break stop` — cancel the break
-- `/break status` — show remaining time and caller
-- `/break options` — open settings
+Primary command:
 
-Aliases:
-- `/breaktimer`
-- `/breaktime`
-- `/bt`
+* `/break [minutes] [reason]`
 
 Examples:
-- `/break`
-- `/break 5 bio`
-- `/break +5`
-- `/break status`
-- `/break stop`
 
----
+* `/break`
+  Starts a break using the configured default duration (default: 5 minutes)
 
-## Sync behavior
+* `/break 10`
+  Starts a 10-minute break
 
-### Always-on sync
-All players with Break Timer Lite installed will see the same:
-- Timer bar
-- Center countdown
-- Extensions and cancellations
+* `/break 7 bio`
+  Starts a 7-minute break with the reason “bio”
 
-### Late join support
-Players who join while a break is already running will automatically request and receive the current break state.
+Extend / stop:
 
-### Authority rules
-- **Party:** Party Leader only
-- **Raid:** Raid Leader and Assist
-- **Solo:** Always allowed
+* `/break +2`
+  Extends the current break by 2 minutes (or starts a 2-minute break if none running)
 
-### Conflict handling
-If multiple break timers collide:
-- Higher authority wins
-- If authority is equal, the newer timer (server timestamp) wins
+* `/break extend 3`
+  Extends the current break by 3 minutes
 
----
+* `/break stop`
+  Cancels the current break
 
-## Visual features
-- Color-changing timer bar (green → yellow → red)
-- Spark and glow effects as the timer nears completion
-- Large center countdown with:
-  - Pulse during the last 10 seconds
-  - Shake and flash effects in the final seconds
-- Screen-edge pulse during the last 10 seconds
-- Center banner messages for:
-  - Break started
-  - Break extended
-  - Break ended
-  - Break canceled
+Status / options:
 
----
+* `/break status`
+  Prints the current break status to your chat frame (local)
 
-## Audio
-- Blizzard group countdown is triggered at 10 seconds
-- Optional built-in beeps at **10 / 3 / 1** seconds
-- No custom sound files required
+* `/break options`
+  Opens the addon options panel
 
----
+Aliases:
 
-## Optional ready check
-If enabled, a ready check is automatically triggered when the break ends (leader/assist only).
+* `/breaktimer`
+* `/breaktime`
+* `/bt`
 
----
+## Options
+
+Open options via:
+
+* **Esc → Options → AddOns → Break Timer Lite**
+* Or: `/break options`
+
+Available options include:
+
+* Toggle **local Raid Warning** display
+* Toggle **warning sounds** and short beeps
+* Toggle **ready check on end** (leader/assist only)
+* Adjust **bar width/height**
+* Toggle **big countdown** + scale
+* Toggle banner visuals
+* Configure default `/break` minutes
+
+### Moving the UI
+
+* Hold **ALT** and drag the **timer bar** to reposition
+* Hold **ALT** and drag the **big countdown** to reposition
 
 ## Installation
-Copy the addon folder to:
 
-The folder should contain:
-- `BreakTimerLite.toc`
-- `Core.lua`
-- `Options.lua`
+1. Download/clone this repository
+2. Copy the folder `BreakTimerLite` into:
 
-Reload your UI:
-- `/reload`
+   * `World of Warcraft/_retail_/Interface/AddOns/`
+3. Restart WoW or run `/reload`
 
----
+## Compatibility Notes
+
+* **Blizzard countdown (/cd 10)** requires being in a group and requires **leader/assist** to trigger (Blizzard restriction).
+* If someone in your group is running an older version of this addon, they may still produce chat spam on their client. Updating everyone removes that.
 
 ## License
-MIT — see `LICENSE.md`
+
+This project is licensed under the MIT License — see `LICENSE.md`.
