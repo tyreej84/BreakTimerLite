@@ -1,5 +1,5 @@
 -- Break Timer Lite - Options.lua
--- Sync is always enabled; no sync toggle.
+-- Sync is always enabled; no minimap icon.
 
 local ADDON, ns = ...
 local panel = CreateFrame("Frame")
@@ -67,40 +67,31 @@ panel:SetScript("OnShow", function(self)
 
   local tip = self:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
   tip:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-  tip:SetText("Sync is always on. Countdown triggers automatically at 10 seconds remaining. Commands: /break [minutes] [reason], /break +5, /break extend 5, /break stop, /break status. Aliases: /breaktimer /breaktime /bt")
+  tip:SetText("Sync is always on. Commands: /break [minutes] [reason], /break +5, /break extend 5, /break stop, /break status. Aliases: /breaktimer /breaktime /bt")
 
   -- Left column
-  MakeCheckbox(self, "Show minimap button", "Show or hide the minimap button.",
-    function() return not db.minimap.hide end,
-    function(v)
-      db.minimap.hide = not v
-      if ns.MinimapButton_Reposition then ns.MinimapButton_Reposition() end
-    end,
-    16, -60
-  )
-
   MakeSlider(self, "Default break minutes (/break)", 1, 30, 1,
     function() return db.defaultMinutes or 5 end,
     function(v) db.defaultMinutes = math.floor(v + 0.5) end,
-    16, -110
+    16, -60
   )
 
   MakeCheckbox(self, "Enable center banner", "Show banners on start, extend, end, and cancel.",
     function() return db.banner.enabled end,
     function(v) db.banner.enabled = v and true or false end,
-    16, -170
+    16, -120
   )
 
   MakeCheckbox(self, "Enable big center timer", "Show a large center countdown (ALT-drag to move).",
     function() return db.big.enabled end,
     function(v) db.big.enabled = v and true or false end,
-    16, -200
+    16, -150
   )
 
   MakeSlider(self, "Big timer scale", 0.8, 2.6, 0.1,
     function() return db.big.scale or 1.6 end,
-    function(v) db.big.scale = math.floor((v + 0.00001) * 10) / 10; if ns.SetBigScale then ns.SetBigScale() end end,
-    16, -250
+    function(v) db.big.scale = math.floor((v + 0.00001) * 10) / 10 end,
+    16, -200
   )
 
   -- Right column
@@ -148,19 +139,19 @@ panel:SetScript("OnShow", function(self)
 
   MakeSlider(self, "Bar width", 180, 520, 10,
     function() return db.width end,
-    function(v) db.width = math.floor(v + 0.5); if ns.SetBarSize then ns.SetBarSize() end end,
+    function(v) db.width = math.floor(v + 0.5); ns.SetBarSize() end,
     320, -290
   )
 
-  MakeSlider(self, "Bar height", 12, 32, 1,
+  MakeSlider(self, "Bar height", 14, 34, 1,
     function() return db.height end,
-    function(v) db.height = math.floor(v + 0.5); if ns.SetBarSize then ns.SetBarSize() end end,
+    function(v) db.height = math.floor(v + 0.5); ns.SetBarSize() end,
     320, -350
   )
 
   local test = CreateFrame("Button", nil, self, "UIPanelButtonTemplate")
   test:SetSize(120, 22)
-  test:SetPoint("TOPLEFT", 16, -360)
+  test:SetPoint("TOPLEFT", 16, -320)
   test:SetText("Test (30s)")
   test:SetScript("OnClick", function()
     ns.StartTimer(30, "Test", true, true, "You")
@@ -175,8 +166,8 @@ panel:SetScript("OnShow", function(self)
   end)
 
   local help = self:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-  help:SetPoint("TOPLEFT", 16, -392)
-  help:SetText("Move bar + big timer: hold ALT and drag. Late-join sync, conflict handling, and version handshake are always on.")
+  help:SetPoint("TOPLEFT", 16, -352)
+  help:SetText("Move bar + big timer: hold ALT and drag. Blizzard countdown text starts at 10 seconds remaining.")
 end)
 
 RegisterOptions(panel)

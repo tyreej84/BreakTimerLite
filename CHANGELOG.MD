@@ -4,33 +4,39 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.1.2] - 2026-01-28
+### Added
+- Blizzard **/cd-style countdown text** now starts automatically at **10 seconds remaining**
+- Countdown start is synchronized across the group:
+  - If the local client is not leader/assist at the 10-second mark, it requests a privileged client to start the countdown
+  - Added synced `CDREQUEST` and `COUNTDOWN` messages to avoid duplicate countdowns
+
+### Changed
+- Removed the minimap button and all minimap-related options/settings
+
+---
+
 ## [1.1.1] - 2026-01-28
 ### Changed
-- **Timer bar visual redesign**:
-  - Replaced classic-style status bar texture with a **sleek flat fill**
-  - Bar is now a **thicker translucent black container** with a subtle border
-  - Inner progress fill uses a **modern flat blue color**
-  - Added a **thin leading-edge line** to indicate remaining progress
-- Improved overall visual clarity to better match modern UI expectations
-
-### Fixed
-- Resolved issue where the bar appeared overly thin and green by default
+- Timer bar visual redesign:
+  - Sleek translucent black container with subtle border
+  - Flat blue progress fill using a modern texture
+  - Thin leading-edge line indicator
 
 ---
 
 ## [1.1.0] - 2026-01-28
 ### Changed
-- **Blizzard countdown behavior corrected**:
-  - Blizzard’s built-in countdown now starts **when the break reaches 10 seconds remaining**
-  - Countdown is only triggered once per break by the authoritative caller
-- Countdown cancellation now occurs correctly when a break is stopped early
+- Blizzard countdown behavior corrected:
+  - Countdown is initiated at the 10-second mark instead of on break start
+- Countdown cancellation improved when stopping a break early
 
 ---
 
 ## [1.0.9] - 2026-01-27
 ### Fixed
 - Fixed an addon load error caused by accessing saved variables before initialization
-- Slash commands (`/break`, `/bt`, etc.) now register reliably on login and reload
+- Slash commands now register reliably on login and reload
 
 ---
 
@@ -52,8 +58,6 @@ All notable changes to **Break Timer Lite** are documented in this file.
   - Higher authority wins
   - If authority is equal, newer timer wins
 - Version handshake between group members with warnings for mismatched versions
-- Enhanced timer bar effects:
-  - Glow effect during the final 10 seconds
 - Screen-edge pulse during the final 10 seconds
 - Optional built-in beeps at 10, 3, and 1 seconds remaining
 - Improved announcement formatting
@@ -69,13 +73,12 @@ All notable changes to **Break Timer Lite** are documented in this file.
   - `/break +<minutes>`
   - `/break extend <minutes>`
 - Center-screen banners for break start, extension, end, and cancellation
-- Expanded minimap menu with quick extend options
 
 ---
 
 ## [1.0.5] - 2026-01-27
 ### Added
-- Blizzard group countdown integration
+- Blizzard group countdown integration (initial implementation)
 
 ---
 
@@ -83,12 +86,6 @@ All notable changes to **Break Timer Lite** are documented in this file.
 ### Added
 - Large center countdown timer with configurable scale and position
 - Visual urgency effects as the timer nears completion
-
----
-
-## [1.0.3] - 2026-01-27
-### Added
-- Minimap button with quick-access menu and tooltip
 
 ---
 
