@@ -1,5 +1,9 @@
 -- Break Timer Lite - Options.lua
 -- No chat options: this addon never sends group/raid chat messages.
+-- Fixes:
+--  - sliders now have names (no nil concat)
+--  - Settings.OpenToCategory uses numeric category ID (modern WoW)
+--  - safe GetDB even if Core hasn't finished loading
 
 local ADDON, ns = ...
 local PANEL_NAME = "Break Timer Lite"
@@ -8,10 +12,12 @@ local function GetDB()
   return (ns and ns.GetDB and ns.GetDB()) or BreakTimerDB
 end
 
+local _categoryID
+
 local function OpenBlizzOptionsToMe()
-  if Settings and Settings.OpenToCategory then
-    Settings.OpenToCategory(PANEL_NAME)
-  else
+  if Settings and Settings.OpenToCategory and _categoryID then
+    Settings.OpenToCategory(_categoryID)
+  elseif InterfaceOptionsFrame_OpenToCategory then
     InterfaceOptionsFrame_OpenToCategory(PANEL_NAME)
     InterfaceOptionsFrame_OpenToCategory(PANEL_NAME)
   end
@@ -42,8 +48,8 @@ local function MakeHeader(parent, anchor, text)
   return fs
 end
 
-local function MakeCheck(parent, anchor, label, tooltip, getter, setter)
-  local cb = CreateFrame("CheckButton", nil, parent, "InterfaceOptionsCheckButtonTemplate")
+local function MakeCheck(name, parent, anchor, label, tooltip, getter, setter)
+  local cb = CreateFrame("CheckButton", name, parent, "InterfaceOptionsCheckButtonTemplate")
   cb:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -10)
   cb.Text:SetText(label)
   cb.tooltipText = tooltip
@@ -53,8 +59,8 @@ local function MakeCheck(parent, anchor, label, tooltip, getter, setter)
   return cb
 end
 
-local function MakeSlider(parent, anchor, label, tooltip, minv, maxv, step, getter, setter, width)
-  local s = CreateFrame("Slider", nil, parent, "OptionsSliderTemplate")
+local function MakeSlider(name, parent, anchor, label, tooltip, minv, maxv, step, getter, setter, width)
+  local s = CreateFrame("Slider", name, parent, "OptionsSliderTemplate")
   s:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -28)
   s:SetWidth(width or 260)
   s:SetMinMaxValues(minv, maxv)
@@ -62,9 +68,10 @@ local function MakeSlider(parent, anchor, label, tooltip, minv, maxv, step, gett
   s:SetObeyStepOnDrag(true)
   s.tooltipText = tooltip
 
-  _G[s:GetName() .. "Text"]:SetText(label)
-  _G[s:GetName() .. "Low"]:SetText(tostring(minv))
-  _G[s:GetName() .. "High"]:SetText(tostring(maxv))
+  local n = s:GetName()
+  _G[n .. "Text"]:SetText(label)
+  _G[n .. "Low"]:SetText(tostring(minv))
+  _G[n .. "High"]:SetText(tostring(maxv))
 
   s:SetScript("OnShow", function(self) self:SetValue(getter()) end)
   s:SetScript("OnValueChanged", function(self, value)
@@ -75,7 +82,7 @@ local function MakeSlider(parent, anchor, label, tooltip, minv, maxv, step, gett
   return s
 end
 
-local panel = CreateFrame("Frame", nil, UIParent)
+local panel = CreateFrame("Frame", "BreakTimerLiteOptionsPanel", UIParent)
 panel.name = PANEL_NAME
 
 local title = MakeTitle(panel, PANEL_NAME)
@@ -88,28 +95,28 @@ local sub = MakeSubText(panel, title,
 
 local headerGeneral = MakeHeader(panel, sub, "General")
 
-local cbRaidWarn = MakeCheck(panel, headerGeneral,
+local cbRaidWarn = MakeCheck("BreakTimerLiteOptRaidWarn", panel, headerGeneral,
   "Show local Raid Warning messages",
   "Shows messages in the Raid Warning frame on your screen (local only; not chat).",
   function() return GetDB().raidWarning end,
   function(v) GetDB().raidWarning = v end
 )
 
-local cbSound = MakeCheck(panel, cbRaidWarn,
+local cbSound = MakeCheck("BreakTimerLiteOptSound", panel, cbRaidWarn,
   "Enable warning sounds",
   "Plays warning sounds at 10 seconds remaining and when the timer ends.",
   function() return GetDB().sound end,
   function(v) GetDB().sound = v end
 )
 
-local cbBeeps = MakeCheck(panel, cbSound,
+local cbBeeps = MakeCheck("BreakTimerLiteOptBeeps", panel, cbSound,
   "Enable short beeps",
   "Plays short beeps at 3 and 1 seconds remaining.",
   function() return GetDB().beeps end,
   function(v) GetDB().beeps = v end
 )
 
-local cbReady = MakeCheck(panel, cbBeeps,
+local cbReady = MakeCheck("BreakTimerLiteOptReady", panel, cbBeeps,
   "Ready check when break ends (leader/assist only)",
   "Starts a ready check when the break ends (requires leader/assist).",
   function() return GetDB().readyCheckOnEnd end,
@@ -118,7 +125,7 @@ local cbReady = MakeCheck(panel, cbBeeps,
 
 local headerBar = MakeHeader(panel, cbReady, "Timer Bar")
 
-local sWidth = MakeSlider(panel, headerBar,
+local sWidth = MakeSlider("BreakTimerLiteOptWidth", panel, headerBar,
   "Bar width",
   "Adjust the timer bar width.",
   180, 520, 10,
@@ -129,7 +136,7 @@ local sWidth = MakeSlider(panel, headerBar,
   end
 )
 
-local sHeight = MakeSlider(panel, sWidth,
+local sHeight = MakeSlider("BreakTimerLiteOptHeight", panel, sWidth,
   "Bar height",
   "Adjust the timer bar height.",
   14, 40, 1,
@@ -140,7 +147,7 @@ local sHeight = MakeSlider(panel, sWidth,
   end
 )
 
-local cbEdgePulse = MakeCheck(panel, sHeight,
+local cbEdgePulse = MakeCheck("BreakTimerLiteOptEdgePulse", panel, sHeight,
   "Screen-edge pulse during last 10 seconds",
   "Shows a subtle red pulse at screen edges during the last 10 seconds.",
   function() return GetDB().edgePulse end,
@@ -149,14 +156,14 @@ local cbEdgePulse = MakeCheck(panel, sHeight,
 
 local headerBig = MakeHeader(panel, cbEdgePulse, "Big Countdown")
 
-local cbBigEnabled = MakeCheck(panel, headerBig,
+local cbBigEnabled = MakeCheck("BreakTimerLiteOptBigEnabled", panel, headerBig,
   "Enable big countdown",
   "Shows a large countdown timer near the center of your screen.",
   function() return GetDB().big.enabled end,
   function(v) GetDB().big.enabled = v end
 )
 
-local sBigScale = MakeSlider(panel, cbBigEnabled,
+local sBigScale = MakeSlider("BreakTimerLiteOptBigScale", panel, cbBigEnabled,
   "Big countdown scale",
   "Adjust the size of the big countdown.",
   1.0, 2.5, 0.1,
@@ -167,21 +174,21 @@ local sBigScale = MakeSlider(panel, cbBigEnabled,
   end
 )
 
-local cbBigPulse = MakeCheck(panel, sBigScale,
+local cbBigPulse = MakeCheck("BreakTimerLiteOptBigPulse", panel, sBigScale,
   "Pulse during last 10 seconds",
   "Adds a subtle pulse effect during the last 10 seconds.",
   function() return GetDB().big.pulseLast10 end,
   function(v) GetDB().big.pulseLast10 = v end
 )
 
-local cbBigShake = MakeCheck(panel, cbBigPulse,
+local cbBigShake = MakeCheck("BreakTimerLiteOptBigShake", panel, cbBigPulse,
   "Shake during last 5 seconds",
   "Adds a subtle shake effect during the last 5 seconds.",
   function() return GetDB().big.shakeLast5 end,
   function(v) GetDB().big.shakeLast5 = v end
 )
 
-local cbBigFlash = MakeCheck(panel, cbBigShake,
+local cbBigFlash = MakeCheck("BreakTimerLiteOptBigFlash", panel, cbBigShake,
   "Flash during last 5 seconds",
   "Adds a subtle flash effect during the last 5 seconds.",
   function() return GetDB().big.flashLast5 end,
@@ -190,7 +197,7 @@ local cbBigFlash = MakeCheck(panel, cbBigShake,
 
 local headerBanner = MakeHeader(panel, cbBigFlash, "Banners")
 
-local cbBanner = MakeCheck(panel, headerBanner,
+local cbBanner = MakeCheck("BreakTimerLiteOptBanner", panel, headerBanner,
   "Enable banners",
   "Shows large banners on start/extend/end/cancel (local only).",
   function() return GetDB().banner.enabled end,
@@ -199,7 +206,7 @@ local cbBanner = MakeCheck(panel, headerBanner,
 
 local headerDefaults = MakeHeader(panel, cbBanner, "Defaults")
 
-local sDefault = MakeSlider(panel, headerDefaults,
+local sDefault = MakeSlider("BreakTimerLiteOptDefaultMin", panel, headerDefaults,
   "Default /break minutes",
   "When you type /break with no arguments, this is the default duration (in minutes).",
   1, 30, 1,
@@ -230,6 +237,12 @@ end)
 if Settings and Settings.RegisterCanvasLayoutCategory then
   local category = Settings.RegisterCanvasLayoutCategory(panel, PANEL_NAME)
   Settings.RegisterAddOnCategory(category)
+
+  if category and category.GetID then
+    _categoryID = category:GetID()
+  elseif category and category.ID then
+    _categoryID = category.ID
+  end
 else
   InterfaceOptions_AddCategory(panel)
 end

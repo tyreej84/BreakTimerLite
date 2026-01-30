@@ -1,5 +1,11 @@
 -- Break Timer Lite - Core.lua
--- v1.2.1 - NO CHAT OUTPUT EVER (no PARTY/RAID/INSTANCE_CHAT spam)
+-- v1.2.2 - NO CHAT OUTPUT EVER (no PARTY/RAID/INSTANCE_CHAT spam)
+-- Fixes:
+--  - Removed SendChatMessage shim (avoids taint / cross-addon issues)
+--  - Robust DB init (db never nil; ns.GetDB always safe)
+--  - Drag-stop guards rel:GetName() nil cases
+--  - Forces legacy chat/reminder flags off (if present in saved vars)
+
 -- Commands:
 --   /break [minutes] [reason]
 --   /break +<minutes>
@@ -12,7 +18,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.2.1"
+local ADDON_VERSION = "1.2.2"
 
 local defaults = {
   width = 260,
@@ -61,30 +67,17 @@ local function CopyDefaults(src, dst)
   return dst
 end
 
--- ------------------------------------------------------------
--- HARD: Block chat spam from this addon
--- ------------------------------------------------------------
-local function InstallNoChatShim()
-  -- If any leftover/old path tries to chat spam, block it when it matches our break reminder pattern.
-  -- We DO NOT globally block chat, only messages matching typical break reminder text.
-  local orig = SendChatMessage
-  if type(orig) ~= "function" then return end
+local function InitDB()
+  if db then return db end
+  BreakTimerDB = CopyDefaults(defaults, BreakTimerDB or {})
+  db = BreakTimerDB
 
-  SendChatMessage = function(msg, chatType, language, channel)
-    -- Common spam strings we never want:
-    -- "*** Break - 2:00 ***", "*** Break - 1:00 ***", etc.
-    if type(msg) == "string" then
-      -- Match both "*** Break - 2:00 ***" and variations.
-      if msg:find("%*%*%*") and msg:lower():find("break") and msg:find("%d+:%d%d") then
-        return
-      end
-      -- Also block very simple "Break - 2:00" just in case.
-      if msg:lower():match("^%s*break%s*%-%s*%d+:%d%d%s*$") then
-        return
-      end
-    end
-    return orig(msg, chatType, language, channel)
-  end
+  -- Force legacy flags off (in case old DBs had them)
+  db.announce = false
+  db.remind = false
+  db.smartAnnounce = false
+
+  return db
 end
 
 -- ------------------------------------------------------------
@@ -108,6 +101,7 @@ end
 
 -- Local overlay message only (NOT chat, NOT raid warning send)
 local function BigWarnLocal(msg)
+  InitDB()
   if not db.raidWarning then return end
   RaidNotice_AddMessage(RaidWarningFrame, msg, ChatTypeInfo["RAID_WARNING"])
 end
@@ -265,6 +259,7 @@ EdgePulse.tex:SetColorTexture(1, 0, 0, 0)
 EdgePulse:Hide()
 
 local function EdgePulseTick(alpha)
+  InitDB()
   if not db.edgePulse then return end
   EdgePulse:Show()
   EdgePulse.tex:SetAlpha(alpha)
@@ -314,6 +309,7 @@ local tOut = Banner.ag:CreateAnimation("Translation"); tOut:SetOffset(0, 18); tO
 Banner.ag:SetScript("OnFinished", function() Banner:Hide(); Banner:SetAlpha(0) end)
 
 local function ShowBanner(mainText, subText)
+  InitDB()
   if not db.banner.enabled then return end
   Banner.text:SetText(mainText or "")
   if subText and subText ~= "" then
@@ -340,9 +336,11 @@ Bar:EnableMouse(true)
 Bar:RegisterForDrag("LeftButton")
 Bar:SetScript("OnDragStart", function(self) if IsAltKeyDown() then self:StartMoving() end end)
 Bar:SetScript("OnDragStop", function(self)
+  InitDB()
   self:StopMovingOrSizing()
   local p, rel, rp, x, y = self:GetPoint(1)
-  db.point = { p, rel:GetName(), rp, x, y }
+  local relName = (rel and rel.GetName and rel:GetName()) or "UIParent"
+  db.point = { p, relName, rp, x, y }
 end)
 
 Bar:SetBackdrop({
@@ -401,11 +399,13 @@ TextRight:SetPoint("RIGHT", -6, 0)
 StyleBarText(TextRight, 12, "RIGHT")
 
 local function SetBarSize()
+  InitDB()
   Bar:SetSize(db.width, db.height)
   EdgeLine:SetSize(2, db.height + 10)
 end
 
 local function SetBarPoint()
+  InitDB()
   Bar:ClearAllPoints()
   local p, relName, rp, x, y = unpack(db.point)
   local rel = _G[relName] or UIParent
@@ -423,9 +423,11 @@ Big:EnableMouse(true)
 Big:RegisterForDrag("LeftButton")
 Big:SetScript("OnDragStart", function(self) if IsAltKeyDown() then self:StartMoving() end end)
 Big:SetScript("OnDragStop", function(self)
+  InitDB()
   self:StopMovingOrSizing()
   local p, rel, rp, x, y = self:GetPoint(1)
-  db.big.point = { p, rel:GetName(), rp, x, y }
+  local relName = (rel and rel.GetName and rel:GetName()) or "UIParent"
+  db.big.point = { p, relName, rp, x, y }
 end)
 Big:SetAlpha(0)
 
@@ -456,6 +458,7 @@ Big.flash:SetColorTexture(1, 1, 1, 0)
 Big.flash:Hide()
 
 local function SetBigPoint()
+  InitDB()
   Big:ClearAllPoints()
   local p, relName, rp, x, y = unpack(db.big.point)
   local rel = _G[relName] or UIParent
@@ -463,6 +466,7 @@ local function SetBigPoint()
 end
 
 local function SetBigScale()
+  InitDB()
   Big:SetScale(db.big.scale or 1.6)
 end
 
@@ -527,6 +531,7 @@ local function RemainingDisplaySeconds(remPrecise)
 end
 
 local function Beep()
+  InitDB()
   if not db.beeps then return end
   PlaySound(SOUNDKIT.UI_IG_MAINMENU_OPTION_CHECKBOX_ON, "Master")
 end
@@ -747,6 +752,7 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
 end
 
 local function StartTimer(seconds, reason, silent, fromSync, callerName, authorityRank, startServerOverride)
+  InitDB()
   seconds = tonumber(seconds)
   if not seconds or seconds <= 0 then return false end
 
@@ -771,6 +777,7 @@ local function StartTimer(seconds, reason, silent, fromSync, callerName, authori
 end
 
 local function StopTimer(silent, fromSync, callerName)
+  InitDB()
   if not state.running then
     CancelBlizzardCountdownBestEffort()
     return
@@ -808,6 +815,7 @@ local function StopTimer(silent, fromSync, callerName)
 end
 
 local function ExtendTimer(addSeconds, silent, fromSync, callerName)
+  InitDB()
   addSeconds = tonumber(addSeconds)
   if not addSeconds or addSeconds <= 0 then return false end
 
@@ -869,6 +877,7 @@ local function ParseInt(tok)
 end
 
 local function HandleSlash(msg)
+  InitDB()
   msg = (msg or ""):gsub("^%s+", ""):gsub("%s+$", "")
 
   if msg == "" then
@@ -1092,14 +1101,7 @@ f:SetScript("OnEvent", function(self, event, ...)
     local name = ...
     if name ~= ADDON then return end
 
-    BreakTimerDB = CopyDefaults(defaults, BreakTimerDB)
-    db = BreakTimerDB
-
-    -- Force legacy flags off
-    db.announce = false
-
-    -- Install anti-chat shim
-    InstallNoChatShim()
+    InitDB()
 
     SetBarSize()
     SetBarPoint()
@@ -1120,8 +1122,8 @@ f:SetScript("OnEvent", function(self, event, ...)
   end
 end)
 
--- Expose to Options.lua
-ns.GetDB = function() return db end
+-- Expose to Options.lua (safe even before ADDON_LOADED)
+ns.GetDB = function() return InitDB() end
 ns.SetBarSize = SetBarSize
 ns.SetBarPoint = SetBarPoint
 ns.SetBigPoint = SetBigPoint

@@ -4,6 +4,20 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.2.2] - 2026-01-30
+### Fixed
+- Fixed Options panel errors on modern Settings UI:
+  - Sliders now have explicit names (prevents `attempt to concatenate a nil value`).
+  - Options opening now uses the Settings category ID (prevents `OpenSettingsPanel ... outside of expected range`).
+- Hardened database initialization so `ns.GetDB()` never returns nil (prevents `attempt to index local 'db' (a nil value)`).
+
+### Changed
+- Removed the chat function override shim to avoid taint and cross-addon interference.  
+  (**Break Timer Lite still sends zero chat messages.**)
+- Guarded drag-stop anchor saving so it won’t error if the relative frame is nil.
+
+---
+
 ## [1.2.1] - 2026-01-28
 ### Changed
 - **Completely removed all chat output** (no PARTY/RAID/INSTANCE chat announcements at any time).
@@ -25,8 +39,6 @@ All notable changes to **Break Timer Lite** are documented in this file.
 ## [1.1.9] - 2026-01-28
 ### Changed
 - Removed all group chat announcements (no 2m/1m/30s/10s spam). Visuals/sounds only.
-
-
 
 ## [1.1.8] - 2026-01-28
 ### Fixed
