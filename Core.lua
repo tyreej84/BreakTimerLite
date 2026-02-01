@@ -1,10 +1,9 @@
 -- Break Timer Lite - Core.lua
--- v1.2.2 - NO CHAT OUTPUT EVER (no PARTY/RAID/INSTANCE_CHAT spam)
+-- v1.2.3 - NO CHAT OUTPUT EVER (no PARTY/RAID/INSTANCE_CHAT spam)
 -- Fixes:
---  - Removed SendChatMessage shim (avoids taint / cross-addon issues)
---  - Robust DB init (db never nil; ns.GetDB always safe)
---  - Drag-stop guards rel:GetName() nil cases
---  - Forces legacy chat/reminder flags off (if present in saved vars)
+--  - StartTimerWithServerTimes() now InitDB() first (prevents nil db on early sync)
+--  - Extra guards for saved point tables + BuildBarLeftText
+--  - More defensive addon message parsing
 
 -- Commands:
 --   /break [minutes] [reason]
@@ -18,7 +17,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.2.2"
+local ADDON_VERSION = "1.2.3"
 
 local defaults = {
   width = 260,
@@ -77,6 +76,12 @@ local function InitDB()
   db.remind = false
   db.smartAnnounce = false
 
+  -- ensure nested tables exist
+  db.big = CopyDefaults(defaults.big, db.big or {})
+  db.banner = CopyDefaults(defaults.banner, db.banner or {})
+  if type(db.point) ~= "table" then db.point = { "CENTER", "UIParent", "CENTER", 0, 180 } end
+  if type(db.big.point) ~= "table" then db.big.point = { "CENTER", "UIParent", "CENTER", 0, 60 } end
+
   return db
 end
 
@@ -99,7 +104,7 @@ local function LocalPrint(msg)
   print("|cffffd100Break Timer Lite|r: " .. msg)
 end
 
--- Local overlay message only (NOT chat, NOT raid warning send)
+-- Local overlay message only (NOT chat)
 local function BigWarnLocal(msg)
   InitDB()
   if not db.raidWarning then return end
@@ -310,7 +315,7 @@ Banner.ag:SetScript("OnFinished", function() Banner:Hide(); Banner:SetAlpha(0) e
 
 local function ShowBanner(mainText, subText)
   InitDB()
-  if not db.banner.enabled then return end
+  if not (db.banner and db.banner.enabled) then return end
   Banner.text:SetText(mainText or "")
   if subText and subText ~= "" then
     Banner.sub:SetText(subText)
@@ -340,7 +345,7 @@ Bar:SetScript("OnDragStop", function(self)
   self:StopMovingOrSizing()
   local p, rel, rp, x, y = self:GetPoint(1)
   local relName = (rel and rel.GetName and rel:GetName()) or "UIParent"
-  db.point = { p, relName, rp, x, y }
+  db.point = { p or "CENTER", relName, rp or "CENTER", x or 0, y or 0 }
 end)
 
 Bar:SetBackdrop({
@@ -400,16 +405,19 @@ StyleBarText(TextRight, 12, "RIGHT")
 
 local function SetBarSize()
   InitDB()
-  Bar:SetSize(db.width, db.height)
-  EdgeLine:SetSize(2, db.height + 10)
+  Bar:SetSize(db.width or defaults.width, db.height or defaults.height)
+  EdgeLine:SetSize(2, (db.height or defaults.height) + 10)
 end
 
 local function SetBarPoint()
   InitDB()
   Bar:ClearAllPoints()
-  local p, relName, rp, x, y = unpack(db.point)
+  local p, relName, rp, x, y = "CENTER", "UIParent", "CENTER", 0, 180
+  if type(db.point) == "table" and #db.point >= 5 then
+    p, relName, rp, x, y = unpack(db.point)
+  end
   local rel = _G[relName] or UIParent
-  Bar:SetPoint(p, rel, rp, x, y)
+  Bar:SetPoint(p or "CENTER", rel, rp or "CENTER", x or 0, y or 0)
 end
 
 -- ------------------------------------------------------------
@@ -427,7 +435,7 @@ Big:SetScript("OnDragStop", function(self)
   self:StopMovingOrSizing()
   local p, rel, rp, x, y = self:GetPoint(1)
   local relName = (rel and rel.GetName and rel:GetName()) or "UIParent"
-  db.big.point = { p, relName, rp, x, y }
+  db.big.point = { p or "CENTER", relName, rp or "CENTER", x or 0, y or 0 }
 end)
 Big:SetAlpha(0)
 
@@ -460,14 +468,17 @@ Big.flash:Hide()
 local function SetBigPoint()
   InitDB()
   Big:ClearAllPoints()
-  local p, relName, rp, x, y = unpack(db.big.point)
+  local p, relName, rp, x, y = "CENTER", "UIParent", "CENTER", 0, 60
+  if db.big and type(db.big.point) == "table" and #db.big.point >= 5 then
+    p, relName, rp, x, y = unpack(db.big.point)
+  end
   local rel = _G[relName] or UIParent
-  Big:SetPoint(p, rel, rp, x, y)
+  Big:SetPoint(p or "CENTER", rel, rp or "CENTER", x or 0, y or 0)
 end
 
 local function SetBigScale()
   InitDB()
-  Big:SetScale(db.big.scale or 1.6)
+  Big:SetScale((db.big and db.big.scale) or 1.6)
 end
 
 local function BigFlashPulse()
@@ -537,6 +548,7 @@ local function Beep()
 end
 
 local function BuildBarLeftText()
+  InitDB()
   local base = db.label or "Break"
   local r = state.reason or ""
   local who = state.caller or ""
@@ -594,7 +606,8 @@ local function SetBigColorByRemaining(remPrecise)
 end
 
 local function UpdateBig(remPrecise, whole)
-  if not db.big.enabled then return end
+  InitDB()
+  if not (db.big and db.big.enabled) then return end
 
   Big.text:SetText(FormatTimeFromSeconds(whole))
   if state.reason ~= "" then
@@ -629,6 +642,7 @@ local function UpdateBig(remPrecise, whole)
 end
 
 local function TryReadyCheck()
+  InitDB()
   if not db.readyCheckOnEnd then return end
   if not IsPrivilegedLocal() then return end
   if type(DoReadyCheck) == "function" then DoReadyCheck() end
@@ -649,6 +663,7 @@ local function ResetFlags()
 end
 
 local function StartTimerWithServerTimes(startServer, endServer, reason, caller, authority, silent, fromSync)
+  InitDB() -- IMPORTANT: remote sync can arrive before ADDON_LOADED
   local seconds = math.max(1, endServer - startServer)
 
   state.running = true
@@ -668,7 +683,7 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
   UpdateBar(RemainingPrecise())
 
   SetBigPoint()
-  state.baseBigScale = db.big.scale or 1.6
+  state.baseBigScale = (db.big and db.big.scale) or 1.6
   if db.big.enabled then
     Big:Show()
     Big:SetScale(state.baseBigScale)
@@ -978,11 +993,13 @@ end
 local function OnAddonMessage(prefix, text, channel, sender)
   if prefix ~= PREFIX then return end
   if sender == UnitName("player") then return end
+  if type(text) ~= "string" then return end
 
   local senderShort = Ambiguate(sender, "short")
   local auth = SenderAuthorityRank(sender)
 
   local action, a, b, c, d, e, f, g = strsplit(";", text)
+  if not action or action == "" then return end
 
   -- Ignore any legacy reminder messages from older versions
   if action == "REMIND" or action == "WARNING" or action == "ANNOUNCE" then
