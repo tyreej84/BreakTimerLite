@@ -1,9 +1,9 @@
 -- Break Timer Lite - Core.lua
--- v1.2.3 - NO CHAT OUTPUT EVER (no PARTY/RAID/INSTANCE_CHAT spam)
+-- v1.2.4 - NO CHAT OUTPUT EVER (no PARTY/RAID/INSTANCE_CHAT spam)
 -- Fixes:
---  - StartTimerWithServerTimes() now InitDB() first (prevents nil db on early sync)
---  - Extra guards for saved point tables + BuildBarLeftText
---  - More defensive addon message parsing
+--  - Sound API compatibility: SafePlaySound() supports modern C_Sound.PlaySound(params)
+--    and safely falls back (prevents "bad argument #1 ... C_Sound.PlaySound(params)")
+--  - Keeps prior DB + sync defensive guards
 
 -- Commands:
 --   /break [minutes] [reason]
@@ -17,7 +17,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.2.3"
+local ADDON_VERSION = "1.2.4"
 
 local defaults = {
   width = 260,
@@ -83,6 +83,36 @@ local function InitDB()
   if type(db.big.point) ~= "table" then db.big.point = { "CENTER", "UIParent", "CENTER", 0, 60 } end
 
   return db
+end
+
+-- ------------------------------------------------------------
+-- Sound compatibility
+-- ------------------------------------------------------------
+local function SafePlaySound(soundKitID, channel)
+  if not soundKitID then return false end
+  channel = channel or "Master"
+
+  -- Modern path some clients route through: C_Sound.PlaySound(params)
+  if C_Sound and type(C_Sound.PlaySound) == "function" then
+    local ok = pcall(C_Sound.PlaySound, { soundKitID = soundKitID, channel = channel })
+    if ok then return true end
+
+    -- Fallback: some builds still accept positional args
+    ok = pcall(C_Sound.PlaySound, soundKitID, channel)
+    if ok then return true end
+    ok = pcall(C_Sound.PlaySound, soundKitID)
+    if ok then return true end
+  end
+
+  -- Legacy globals
+  if type(PlaySound) == "function" then
+    local ok = pcall(PlaySound, soundKitID, channel)
+    if ok then return true end
+    ok = pcall(PlaySound, soundKitID)
+    if ok then return true end
+  end
+
+  return false
 end
 
 -- ------------------------------------------------------------
@@ -544,7 +574,7 @@ end
 local function Beep()
   InitDB()
   if not db.beeps then return end
-  PlaySound(SOUNDKIT.UI_IG_MAINMENU_OPTION_CHECKBOX_ON, "Master")
+  SafePlaySound(SOUNDKIT and SOUNDKIT.UI_IG_MAINMENU_OPTION_CHECKBOX_ON, "Master")
 end
 
 local function BuildBarLeftText()
@@ -710,7 +740,7 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
       FlashScreen()
       ShowBanner("BREAK OVER", state.reason ~= "" and state.reason or "")
       BigWarnLocal("BREAK OVER!")
-      if db.sound then PlaySound(SOUNDKIT.RAID_WARNING, "Master") end
+      if db.sound then SafePlaySound(SOUNDKIT and SOUNDKIT.RAID_WARNING, "Master") end
       if db.big.enabled then FadeFrameTo(Big, 0, 0.20) end
 
       EdgePulseOff()
@@ -743,7 +773,7 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
       state.warned10 = true
       FlashScreen()
       BigWarnLocal("Break ends in 10 seconds!")
-      if db.sound then PlaySound(SOUNDKIT.RAID_WARNING, "Master") end
+      if db.sound then SafePlaySound(SOUNDKIT and SOUNDKIT.RAID_WARNING, "Master") end
       Beep()
     end
 

@@ -3,18 +3,29 @@
 All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
-
-## [1.2.2] - 2026-01-30
+## [1.2.4] - 2026-02-04
 ### Fixed
-- Fixed Options panel errors on modern Settings UI:
-  - Sliders now have explicit names (prevents `attempt to concatenate a nil value`).
-  - Options opening now uses the Settings category ID (prevents `OpenSettingsPanel ... outside of expected range`).
-- Hardened database initialization so `ns.GetDB()` never returns nil (prevents `attempt to index local 'db' (a nil value)`).
+- Fixed rare sound errors (`bad argument #1 ... C_Sound.PlaySound(params)`) by routing all sound playback through a defensive `SafePlaySound()` wrapper compatible with modern WoW sound APIs.
 
 ### Changed
-- Removed the chat function override shim to avoid taint and cross-addon interference.  
-  (**Break Timer Lite still sends zero chat messages.**)
-- Guarded drag-stop anchor saving so it won’t error if the relative frame is nil.
+- Options layout adjusted so **all sliders are on the left column**, preventing slider widgets from rendering outside the Settings panel bounds.
+
+## [1.2.3] - 2026-02-01
+### Fixed
+- Prevented rare `db` nil errors when receiving sync messages before the addon finishes loading by initializing the database at the start of the synced timer path.
+- Added extra safety guards for saved anchor points and bar label building.
+
+### Changed
+- Reworked the Options panel into a **two-column layout** so it no longer runs off-screen in the in-game Settings UI (no scrolling required).
+
+---
+
+## [1.2.2] - 2026-01-28
+### Fixed
+- Removed SendChatMessage shim (avoids taint / cross-addon issues)
+- Robust DB init (db never nil; ns.GetDB always safe)
+- Drag-stop guards rel:GetName() nil cases
+- Forces legacy chat/reminder flags off (if present in saved vars)
 
 ---
 
@@ -39,6 +50,8 @@ All notable changes to **Break Timer Lite** are documented in this file.
 ## [1.1.9] - 2026-01-28
 ### Changed
 - Removed all group chat announcements (no 2m/1m/30s/10s spam). Visuals/sounds only.
+
+---
 
 ## [1.1.8] - 2026-01-28
 ### Fixed
