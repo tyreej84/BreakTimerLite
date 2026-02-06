@@ -3,12 +3,25 @@
 All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
-## [1.2.4] - 2026-02-04
-### Fixed
-- Fixed rare sound errors (`bad argument #1 ... C_Sound.PlaySound(params)`) by routing all sound playback through a defensive `SafePlaySound()` wrapper compatible with modern WoW sound APIs.
 
-### Changed
-- Options layout adjusted so **all sliders are on the left column**, preventing slider widgets from rendering outside the Settings panel bounds.
+## [1.2.5] - 2026-02-05
+### Added
+- Added **/pull [seconds]** (defaults to 10 seconds):
+  - Shows big on-screen numbers locally (no chat).
+  - Starts Blizzard countdown text when possible (leader/assist while grouped).
+  - Plays a sound at **10** and again at **5, 4, 3, 2, 1**.
+  - Syncs pull starts across the group via addon messages so everyone’s big numbers line up.
+
+### Fixed
+- Sound API compatibility: safer playback across clients using `C_Sound.PlaySound(params)` when required, with fallbacks.
+
+---
+
+## [1.2.4] - 2026-02-03
+### Fixed
+- Sound API compatibility: SafePlaySound() supports modern `C_Sound.PlaySound(params)` and safely falls back.
+
+---
 
 ## [1.2.3] - 2026-02-01
 ### Fixed

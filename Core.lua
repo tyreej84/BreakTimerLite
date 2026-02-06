@@ -1,10 +1,19 @@
--- Break Timer Lite - Core.lua
--- v1.2.4 - NO CHAT OUTPUT EVER (no PARTY/RAID/INSTANCE_CHAT spam)
+-- Core.lua
+-- Break Timer Lite
+-- v1.2.5
+-- NO CHAT OUTPUT EVER (no PARTY/RAID/INSTANCE_CHAT spam)
+--
 -- Fixes:
 --  - Sound API compatibility: SafePlaySound() supports modern C_Sound.PlaySound(params)
---    and safely falls back (prevents "bad argument #1 ... C_Sound.PlaySound(params)")
---  - Keeps prior DB + sync defensive guards
-
+--    and safely falls back.
+--
+-- Added:
+--  - /pull [seconds] : pull countdown (defaults to 10)
+--    • Uses Blizzard countdown text (/cd-style) when possible (leader/assist only while grouped)
+--    • Shows big on-screen numbers locally (no chat)
+--    • Plays sound at 10 and at 5..1
+--    • Syncs pull starts across group via addon messages so everyone's big numbers match
+--
 -- Commands:
 --   /break [minutes] [reason]
 --   /break +<minutes>
@@ -12,12 +21,14 @@
 --   /break stop
 --   /break status
 --   /break options
+--   /pull [seconds]
+--
 -- Aliases:
 --   /breaktimer /breaktime /bt
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.2.4"
+local ADDON_VERSION = "1.2.5"
 
 local defaults = {
   width = 260,
@@ -49,6 +60,15 @@ local defaults = {
   },
 
   banner = { enabled = true },
+
+  pull = {
+    enabled = true,
+    defaultSeconds = 10,
+    scale = 3.0,
+    point = { "CENTER", "UIParent", "CENTER", 0, 140 },
+    soundAt10 = true,
+    soundLast5 = true,
+  },
 }
 
 BreakTimerDB = BreakTimerDB or {}
@@ -79,8 +99,11 @@ local function InitDB()
   -- ensure nested tables exist
   db.big = CopyDefaults(defaults.big, db.big or {})
   db.banner = CopyDefaults(defaults.banner, db.banner or {})
+  db.pull = CopyDefaults(defaults.pull, db.pull or {})
+
   if type(db.point) ~= "table" then db.point = { "CENTER", "UIParent", "CENTER", 0, 180 } end
   if type(db.big.point) ~= "table" then db.big.point = { "CENTER", "UIParent", "CENTER", 0, 60 } end
+  if type(db.pull.point) ~= "table" then db.pull.point = { "CENTER", "UIParent", "CENTER", 0, 140 } end
 
   return db
 end
@@ -92,19 +115,15 @@ local function SafePlaySound(soundKitID, channel)
   if not soundKitID then return false end
   channel = channel or "Master"
 
-  -- Modern path some clients route through: C_Sound.PlaySound(params)
   if C_Sound and type(C_Sound.PlaySound) == "function" then
     local ok = pcall(C_Sound.PlaySound, { soundKitID = soundKitID, channel = channel })
     if ok then return true end
-
-    -- Fallback: some builds still accept positional args
     ok = pcall(C_Sound.PlaySound, soundKitID, channel)
     if ok then return true end
     ok = pcall(C_Sound.PlaySound, soundKitID)
     if ok then return true end
   end
 
-  -- Legacy globals
   if type(PlaySound) == "function" then
     local ok = pcall(PlaySound, soundKitID, channel)
     if ok then return true end
@@ -240,12 +259,18 @@ end
 -- ------------------------------------------------------------
 -- Blizzard countdown text (same as /cd 10)
 -- ------------------------------------------------------------
-local function DoBlizzardCountdown10()
+local function DoBlizzardCountdown(seconds)
+  seconds = tonumber(seconds)
+  if not seconds or seconds <= 0 then return false end
   if not (C_PartyInfo and C_PartyInfo.DoCountdown) then return false end
   if GetGroupChannel() == nil then return false end
   if not IsPrivilegedLocal() then return false end
-  C_PartyInfo.DoCountdown(10)
+  C_PartyInfo.DoCountdown(seconds)
   return true
+end
+
+local function DoBlizzardCountdown10()
+  return DoBlizzardCountdown(10)
 end
 
 local function CancelBlizzardCountdownBestEffort()
@@ -361,7 +386,7 @@ local function ShowBanner(mainText, subText)
 end
 
 -- ------------------------------------------------------------
--- UI: Sleek bar (simple white text)
+-- UI: Sleek bar
 -- ------------------------------------------------------------
 local Bar = CreateFrame("Frame", "BreakTimerLiteBar", UIParent, "BackdropTemplate")
 Bar:Hide()
@@ -451,7 +476,7 @@ local function SetBarPoint()
 end
 
 -- ------------------------------------------------------------
--- UI: Big center timer
+-- UI: Big break countdown
 -- ------------------------------------------------------------
 local Big = CreateFrame("Frame", "BreakTimerLiteBigFrame", UIParent)
 Big:Hide()
@@ -536,7 +561,58 @@ local function FadeFrameTo(frame, targetAlpha, duration)
 end
 
 -- ------------------------------------------------------------
--- Timer state
+-- UI: Pull big numbers (local overlay)
+-- ------------------------------------------------------------
+local Pull = CreateFrame("Frame", "BreakTimerLitePullFrame", UIParent)
+Pull:Hide()
+Pull:SetClampedToScreen(true)
+Pull:SetMovable(true)
+Pull:EnableMouse(true)
+Pull:RegisterForDrag("LeftButton")
+Pull:SetScript("OnDragStart", function(self) if IsAltKeyDown() then self:StartMoving() end end)
+Pull:SetScript("OnDragStop", function(self)
+  InitDB()
+  self:StopMovingOrSizing()
+  local p, rel, rp, x, y = self:GetPoint(1)
+  local relName = (rel and rel.GetName and rel:GetName()) or "UIParent"
+  db.pull.point = { p or "CENTER", relName, rp or "CENTER", x or 0, y or 0 }
+end)
+Pull:SetAlpha(0)
+
+Pull.text = Pull:CreateFontString(nil, "OVERLAY")
+Pull.text:SetPoint("CENTER", 0, 0)
+Pull.text:SetFont(STANDARD_TEXT_FONT, 96, "OUTLINE")
+Pull.text:SetShadowOffset(3, -3)
+Pull.text:SetShadowColor(0, 0, 0, 1)
+Pull.text:SetJustifyH("CENTER")
+Pull.text:SetText("")
+
+Pull.sub = Pull:CreateFontString(nil, "OVERLAY")
+Pull.sub:SetPoint("TOP", Pull.text, "BOTTOM", 0, -8)
+Pull.sub:SetFont(STANDARD_TEXT_FONT, 18, "OUTLINE")
+Pull.sub:SetShadowOffset(2, -2)
+Pull.sub:SetShadowColor(0, 0, 0, 1)
+Pull.sub:SetJustifyH("CENTER")
+Pull.sub:SetText("PULL")
+
+local function SetPullPoint()
+  InitDB()
+  Pull:ClearAllPoints()
+  local p, relName, rp, x, y = "CENTER", "UIParent", "CENTER", 0, 140
+  if db.pull and type(db.pull.point) == "table" and #db.pull.point >= 5 then
+    p, relName, rp, x, y = unpack(db.pull.point)
+  end
+  local rel = _G[relName] or UIParent
+  Pull:SetPoint(p or "CENTER", rel, rp or "CENTER", x or 0, y or 0)
+end
+
+local function SetPullScale()
+  InitDB()
+  Pull:SetScale((db.pull and db.pull.scale) or 3.0)
+end
+
+-- ------------------------------------------------------------
+-- Break timer state
 -- ------------------------------------------------------------
 local state = {
   running = false,
@@ -566,7 +642,6 @@ local function RemainingPrecise()
   return state.endLocal - GetTime()
 end
 
--- Display seconds are CEIL(rem) to match Blizzard countdown integer boundaries.
 local function RemainingDisplaySeconds(remPrecise)
   return math.max(0, math.ceil(remPrecise))
 end
@@ -693,7 +768,7 @@ local function ResetFlags()
 end
 
 local function StartTimerWithServerTimes(startServer, endServer, reason, caller, authority, silent, fromSync)
-  InitDB() -- IMPORTANT: remote sync can arrive before ADDON_LOADED
+  InitDB()
   local seconds = math.max(1, endServer - startServer)
 
   state.running = true
@@ -901,6 +976,140 @@ local function ExtendTimer(addSeconds, silent, fromSync, callerName)
 end
 
 -- ------------------------------------------------------------
+-- Pull timer state + logic
+-- ------------------------------------------------------------
+local pullState = {
+  running = false,
+  endLocal = 0,
+  lastWhole = nil,
+  ticker = nil,
+  startedBy = "",
+}
+
+local function PullRemainingPrecise()
+  return pullState.endLocal - GetTime()
+end
+
+local function PullRemainingWhole(remPrecise)
+  return math.max(0, math.ceil(remPrecise))
+end
+
+local function PullStopInternal()
+  if pullState.ticker then pullState.ticker:Cancel(); pullState.ticker = nil end
+  pullState.running = false
+  pullState.lastWhole = nil
+  pullState.startedBy = ""
+  FadeFrameTo(Pull, 0, 0.12)
+  C_Timer.After(0.14, function()
+    if not pullState.running then
+      Pull:Hide()
+      Pull.text:SetText("")
+    end
+  end)
+end
+
+local function PullShow()
+  InitDB()
+  SetPullPoint()
+  SetPullScale()
+  Pull:Show()
+  Pull:SetAlpha(0)
+  FadeFrameTo(Pull, 1, 0.12)
+end
+
+local function PullSoundAt(whole)
+  InitDB()
+  if not db.sound then return end
+  if whole == 10 and db.pull.soundAt10 then
+    SafePlaySound(SOUNDKIT and SOUNDKIT.RAID_WARNING, "Master")
+  elseif whole <= 5 and whole >= 1 and db.pull.soundLast5 then
+    SafePlaySound(SOUNDKIT and SOUNDKIT.RAID_WARNING, "Master")
+  end
+end
+
+local function StartPullLocal(seconds, starterShort, fromSync)
+  InitDB()
+  seconds = tonumber(seconds)
+  if not seconds or seconds <= 0 then return false end
+  seconds = math.floor(seconds + 0.5)
+
+  pullState.running = true
+  pullState.startedBy = starterShort or ""
+  pullState.lastWhole = nil
+  pullState.endLocal = GetTime() + seconds
+
+  PullShow()
+
+  if pullState.ticker then pullState.ticker:Cancel() end
+  pullState.ticker = C_Timer.NewTicker(0.05, function()
+    if not pullState.running then return end
+    local rem = PullRemainingPrecise()
+    if rem <= 0 then
+      Pull.text:SetText("GO")
+      PullSoundAt(1)
+      C_Timer.After(0.35, function()
+        if pullState.running then
+          PullStopInternal()
+        end
+      end)
+      pullState.running = false
+      if pullState.ticker then pullState.ticker:Cancel(); pullState.ticker = nil end
+      return
+    end
+
+    local whole = PullRemainingWhole(rem)
+    Pull.text:SetText(tostring(whole))
+
+    if pullState.lastWhole ~= whole then
+      PullSoundAt(whole)
+      pullState.lastWhole = whole
+    end
+  end)
+
+  return true
+end
+
+local function StartPull(seconds, fromSync, senderName, senderAuth)
+  InitDB()
+
+  seconds = tonumber(seconds)
+  if not seconds or seconds <= 0 then
+    seconds = (db.pull and tonumber(db.pull.defaultSeconds)) or 10
+  end
+  seconds = math.max(1, math.min(60, math.floor(seconds + 0.5))) -- keep sane
+
+  local grouped = (GetGroupChannel() ~= nil)
+  if grouped and not fromSync and not IsPrivilegedLocal() then
+    LocalPrint("Only the leader (or raid assist) can start a pull timer.")
+    return false
+  end
+
+  local starter = senderName and senderName ~= "" and senderName or Ambiguate(UnitName("player") or "", "short")
+
+  -- Start Blizzard countdown text if we can (leader/assist only)
+  if grouped and not fromSync then
+    DoBlizzardCountdown(seconds)
+  end
+
+  -- Start local big numbers
+  StartPullLocal(seconds, starter, fromSync)
+
+  -- Sync to group so everyone sees big numbers aligned
+  if grouped and not fromSync then
+    local startServer = NowServer()
+    SyncSend(string.format("PULL;%d;%d;%s;%d;%s",
+      startServer,
+      seconds,
+      starter,
+      LocalAuthorityRank(),
+      ADDON_VERSION
+    ))
+  end
+
+  return true
+end
+
+-- ------------------------------------------------------------
 -- Slash commands
 -- ------------------------------------------------------------
 local function PrintHelp()
@@ -911,8 +1120,9 @@ local function PrintHelp()
   LocalPrint("/break stop                    - cancel break")
   LocalPrint("/break status                  - show current state")
   LocalPrint("/break options                 - open options")
+  LocalPrint("/pull [seconds]                - pull countdown (defaults 10)")
   LocalPrint("Aliases: /breaktimer /breaktime /bt")
-  LocalPrint("Move bar + big timer: hold ALT and drag.")
+  LocalPrint("Move bar + big timer + pull: hold ALT and drag.")
 end
 
 local function ParseInt(tok)
@@ -996,6 +1206,17 @@ SLASH_BREAKTIMERLITE3 = "/breaktime"
 SLASH_BREAKTIMERLITE4 = "/bt"
 SlashCmdList["BREAKTIMERLITE"] = HandleSlash
 
+SLASH_BREAKTIMERLITEPULL1 = "/pull"
+SlashCmdList["BREAKTIMERLITEPULL"] = function(msg)
+  InitDB()
+  msg = (msg or ""):gsub("^%s+", ""):gsub("%s+$", "")
+  local sec = ParseInt(msg)
+  if not sec or sec <= 0 then
+    sec = (db.pull and tonumber(db.pull.defaultSeconds)) or 10
+  end
+  StartPull(sec, false, Ambiguate(UnitName("player") or "", "short"), LocalAuthorityRank())
+end
+
 -- ------------------------------------------------------------
 -- Version handshake + late-join sync + countdown request/confirm
 -- ------------------------------------------------------------
@@ -1031,7 +1252,6 @@ local function OnAddonMessage(prefix, text, channel, sender)
   local action, a, b, c, d, e, f, g = strsplit(";", text)
   if not action or action == "" then return end
 
-  -- Ignore any legacy reminder messages from older versions
   if action == "REMIND" or action == "WARNING" or action == "ANNOUNCE" then
     return
   end
@@ -1132,6 +1352,26 @@ local function OnAddonMessage(prefix, text, channel, sender)
     end
     return
   end
+
+  if action == "PULL" then
+    -- PULL;startServer;seconds;starter;authority;ver
+    if auth < 2 then return end
+    local startServer = tonumber(a or 0) or 0
+    local seconds = tonumber(b or 0) or 0
+    local starter = c or senderShort
+    local authority = tonumber(d or auth) or auth
+
+    if startServer <= 0 or seconds <= 0 then return end
+
+    -- Align by server time so late receivers stay synced
+    local delta = (startServer + seconds) - NowServer()
+    local rem = delta
+    if rem <= 0 then return end
+
+    -- Start local big numbers with remaining time
+    StartPullLocal(rem, starter, true)
+    return
+  end
 end
 
 -- ------------------------------------------------------------
@@ -1154,10 +1394,12 @@ f:SetScript("OnEvent", function(self, event, ...)
     SetBarPoint()
     SetBigPoint()
     SetBigScale()
+    SetPullPoint()
+    SetPullScale()
 
     C_ChatInfo.RegisterAddonMessagePrefix(PREFIX)
 
-    LocalPrint("loaded. /break [minutes] [reason]  (aliases: /breaktimer /breaktime /bt)")
+    LocalPrint("loaded. /break [minutes] [reason]  (aliases: /breaktimer /breaktime /bt)  |  /pull [seconds]")
   elseif event == "CHAT_MSG_ADDON" then
     local prefix, text, channel, sender = ...
     OnAddonMessage(prefix, text, channel, sender)
@@ -1175,7 +1417,10 @@ ns.SetBarSize = SetBarSize
 ns.SetBarPoint = SetBarPoint
 ns.SetBigPoint = SetBigPoint
 ns.SetBigScale = SetBigScale
+ns.SetPullPoint = SetPullPoint
+ns.SetPullScale = SetPullScale
 ns.StartTimer = StartTimer
 ns.StopTimer = StopTimer
 ns.ExtendTimer = ExtendTimer
+ns.StartPull = StartPull
 ns.OpenStatus = function() HandleSlash("status") end

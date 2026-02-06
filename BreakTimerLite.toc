@@ -1,8 +1,8 @@
 ## Interface: 120000
 ## Title: Break Timer Lite
-## Notes: Synced break timer (leader/assist only). Sleek bar + big countdown + banners. Triggers Blizzard /cd 10 at 10s. Ready check at end. NO chat spam. No minimap icon.
+## Notes: Synced break timer (leader/assist only). Sleek bar + big countdown + banners. Triggers Blizzard /cd 10 at 10s. Ready check at end. NO chat spam. Includes /pull (big numbers + sounds), synced by addon messages.
 ## Author: Karnytine-Stormrage (joe@tyreenet.com)
-## Version: 1.2.4
+## Version: 1.2.5
 ## SavedVariables: BreakTimerDB
 
 Core.lua
