@@ -1,8 +1,8 @@
 # Break Timer Lite
 
-A lightweight, synced break timer addon for World of Warcraft.
+A lightweight, synced break + pull timer addon for World of Warcraft.
 
-**Break Timer Lite** is designed to feel like a polished, purpose-built break timer: one person starts it, everyone with the addon sees the same timer, and it automatically triggers Blizzard’s built-in 10-second countdown **and a Ready Check** at the end — without spamming group chat.
+**Break Timer Lite** is designed to feel like a polished, purpose-built timer utility: one person starts it, everyone with the addon sees the same timer, and it can trigger Blizzard’s built-in countdown text and a Ready Check — **without spamming group chat**.
 
 ---
 
@@ -18,10 +18,10 @@ A lightweight, synced break timer addon for World of Warcraft.
 - **Sleek timer bar**
   - Translucent black container with a blue progress fill
   - **White text** for maximum readability
-- **Big countdown (optional)**
-  - Large center-screen countdown with last-seconds polish
-- **Blizzard countdown at 10 seconds**
-  - At **10 seconds remaining**, the addon triggers Blizzard’s built-in countdown (`/cd 10`)
+- **Big break countdown (optional)**
+  - Large center-screen countdown with last-seconds polish (pulse/shake/flash options)
+- **Blizzard countdown at 10 seconds (break timer)**
+  - At **10 seconds remaining**, the break timer triggers Blizzard’s built-in countdown text
 - **Automatic Ready Check**
   - When the break completes, the addon **automatically starts a Ready Check**
   - Requires **Party Leader / Raid Leader / Raid Assistant**
@@ -31,50 +31,75 @@ A lightweight, synced break timer addon for World of Warcraft.
 - **Conflict handling**
   - If multiple breaks are started, the timer from the **highest authority** wins
 
+### Pull Timer
+
+- **/pull countdown (synced)**
+  - `/pull [seconds]` starts a pull countdown (defaults to **10 seconds**)
+  - Shows **big on-screen numbers** locally for the pull timer (no chat)
+  - Plays an alert at **10 seconds**, and again at **5, 4, 3, 2, 1**
+  - When possible, also starts Blizzard’s built-in countdown text for the same duration
+  - Synced via addon messages so everyone’s pull numbers align
+
 ---
 
 ## Commands
 
+### Break Timer
+
 **Primary command:**
 
-/break [minutes] [reason]
+`/break [minutes] [reason]`
 
-### Examples
+#### Examples
 
-/break  
+`/break`  
 Starts a break using the configured default duration (default: 5 minutes)
 
-/break 10  
+`/break 10`  
 Starts a 10-minute break
 
-/break 7 bio  
+`/break 7 bio`  
 Starts a 7-minute break with the reason “bio”
 
-### Extend / Stop
+#### Extend / Stop
 
-/break +2  
+`/break +2`  
 Extends the current break by 2 minutes  
 (or starts a 2-minute break if none is running)
 
-/break extend 3  
+`/break extend 3`  
 Extends the current break by 3 minutes
 
-/break stop  
+`/break stop`  
 Cancels the current break
 
-### Status / Options
+#### Status / Options
 
-/break status  
+`/break status`  
 Prints the current break status (local only)
 
-/break options  
+`/break options`  
 Opens the addon options panel
 
-### Aliases
+#### Aliases
 
-- /breaktimer
-- /breaktime
-- /bt
+- `/breaktimer`
+- `/breaktime`
+- `/bt`
+
+### Pull Timer
+
+`/pull [seconds]`
+
+#### Examples
+
+`/pull`  
+Starts a 10-second pull countdown (default)
+
+`/pull 8`  
+Starts an 8-second pull countdown
+
+> Note: While grouped, starting Blizzard’s built-in countdown requires leader/assist permissions, but the on-screen pull numbers are still shown locally and synced to other addon users.
 
 ---
 
@@ -87,20 +112,29 @@ Open options via:
 
 Available options include:
 
+### Break Timer Options
 - Toggle **local Raid Warning** messages
 - Toggle **warning sounds** and short beeps
 - Toggle **automatic Ready Check on break completion**
 - Adjust **bar width and height**
-- Enable/disable **big countdown** and adjust its scale
+- Enable/disable **big break countdown** and adjust its scale
 - Enable/disable **banner notifications**
 - Configure default `/break` duration
+
+### Pull Timer Options
+- Enable/disable the **pull timer overlay**
+- Adjust **pull number scale**
+- Configure default `/pull` duration (seconds)
+- Toggle alert at **10 seconds**
+- Toggle alerts at **5 to 1**
 
 ---
 
 ## Moving the UI
 
 - Hold **ALT** and drag the **timer bar** to reposition it
-- Hold **ALT** and drag the **big countdown** to reposition it
+- Hold **ALT** and drag the **big break countdown** to reposition it
+- Hold **ALT** and drag the **pull numbers** to reposition them
 
 ---
 
@@ -109,7 +143,7 @@ Available options include:
 1. Download or clone this repository
 2. Copy the folder `BreakTimerLite` into:
 
-World of Warcraft/_retail_/Interface/AddOns/
+`World of Warcraft/_retail_/Interface/AddOns/`
 
 3. Restart WoW or run `/reload`
 
@@ -117,9 +151,10 @@ World of Warcraft/_retail_/Interface/AddOns/
 
 ## Notes
 
-- Blizzard’s countdown text (`/cd 10`) and the **Ready Check** both require:
+- Blizzard’s countdown text and the **Ready Check** require:
   - Being in a party or raid
   - Having leader or assist permissions
+- The addon’s notifications (banners, raid warning frame messages, big numbers) are **local-only** and **never** sent to group chat.
 
 ---
 
