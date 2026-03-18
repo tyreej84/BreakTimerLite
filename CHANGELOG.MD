@@ -4,7 +4,7 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
-## [Unreleased]
+## [1.2.6] - 2026-03-18
 ### Fixed
 - Active break timers now persist through `/reload` by saving the running break state and restoring it on addon load if it has not expired.
 - Hardened saved-variable access paths against malformed data to prevent table-index Lua errors in core runtime and options.

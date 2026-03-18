@@ -1,6 +1,6 @@
 -- Core.lua
 -- Break Timer Lite
--- v1.2.5
+-- v1.2.6
 -- NO CHAT OUTPUT EVER (no PARTY/RAID/INSTANCE_CHAT spam)
 --
 -- Fixes:
@@ -28,7 +28,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.2.5"
+local ADDON_VERSION = "1.2.6"
 local dbRepairedOnLoad = false
 
 local defaults = {
