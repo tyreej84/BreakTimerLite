@@ -8,6 +8,14 @@ A lightweight, synced break + pull timer addon for World of Warcraft.
 
 ## Features
 
+### Addon Coverage Note
+
+Break Timer Lite works best when everyone in your party or raid has the addon installed.
+
+- Synced break timers, late-join sync, and synced pull overlays require other players to also run Break Timer Lite.
+- Players without the addon will not see the addon UI elements and addon-driven sync behavior.
+- For the most consistent timer experience across the whole group, install it on all members.
+
 - **Synced timers** across the party/raid via addon communication
 - **Leader/assist control**
   - In parties: **Party Leader** can start/extend/stop
@@ -28,6 +36,10 @@ A lightweight, synced break + pull timer addon for World of Warcraft.
   - Can be toggled on or off in the options
 - **Late-join sync**
   - Players joining mid-break will automatically sync and see the correct remaining time
+- **Reload-safe break timer**
+  - An active break is restored after `/reload` as long as it has not already expired
+- **Group chat status query**
+  - During an active break, anyone can type `!break` in party/raid/instance chat to get a time-left reply
 - **Conflict handling**
   - If multiple breaks are started, the timer from the **highest authority** wins
 

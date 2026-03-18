@@ -10,14 +10,14 @@ local PANEL_NAME = "Break Timer Lite"
 
 local function GetDB()
   local d = (ns and ns.GetDB and ns.GetDB()) or BreakTimerDB
-  if not d then
-    BreakTimerDB = BreakTimerDB or {}
+  if type(d) ~= "table" then
+    BreakTimerDB = {}
     d = BreakTimerDB
   end
   -- ensure tables (in case Options loads early)
-  d.big = d.big or {}
-  d.banner = d.banner or {}
-  d.pull = d.pull or {}
+  if type(d.big) ~= "table" then d.big = {} end
+  if type(d.banner) ~= "table" then d.banner = {} end
+  if type(d.pull) ~= "table" then d.pull = {} end
   return d
 end
 

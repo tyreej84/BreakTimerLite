@@ -29,6 +29,7 @@
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
 local ADDON_VERSION = "1.2.5"
+local dbRepairedOnLoad = false
 
 local defaults = {
   width = 260,
@@ -86,10 +87,85 @@ local function CopyDefaults(src, dst)
   return dst
 end
 
+local function NormalizeDBShape(d)
+  local repaired = false
+
+  if type(d) ~= "table" then
+    d = {}
+    repaired = true
+  end
+
+  local function EnsureTableKey(tbl, key, defaultValue)
+    if type(tbl[key]) ~= "table" then
+      tbl[key] = CopyDefaults(defaultValue, {})
+      repaired = true
+    end
+  end
+
+  local function EnsureScalarNumber(tbl, key, fallback)
+    if type(tbl[key]) ~= "number" then
+      tbl[key] = fallback
+      repaired = true
+    end
+  end
+
+  local function EnsureScalarBoolean(tbl, key, fallback)
+    if type(tbl[key]) ~= "boolean" then
+      tbl[key] = fallback
+      repaired = true
+    end
+  end
+
+  local function EnsureScalarString(tbl, key, fallback)
+    if type(tbl[key]) ~= "string" then
+      tbl[key] = fallback
+      repaired = true
+    end
+  end
+
+  EnsureScalarNumber(d, "width", defaults.width)
+  EnsureScalarNumber(d, "height", defaults.height)
+  EnsureScalarNumber(d, "defaultMinutes", defaults.defaultMinutes)
+  EnsureScalarBoolean(d, "announce", false)
+  EnsureScalarBoolean(d, "raidWarning", defaults.raidWarning)
+  EnsureScalarBoolean(d, "sound", defaults.sound)
+  EnsureScalarString(d, "label", defaults.label)
+  EnsureScalarBoolean(d, "beeps", defaults.beeps)
+  EnsureScalarBoolean(d, "edgePulse", defaults.edgePulse)
+  EnsureScalarBoolean(d, "readyCheckOnEnd", defaults.readyCheckOnEnd)
+
+  EnsureTableKey(d, "point", defaults.point)
+  EnsureTableKey(d, "big", defaults.big)
+  EnsureTableKey(d, "banner", defaults.banner)
+  EnsureTableKey(d, "pull", defaults.pull)
+  EnsureTableKey(d, "runtime", {})
+
+  EnsureTableKey(d.big, "point", defaults.big.point)
+  EnsureScalarBoolean(d.big, "enabled", defaults.big.enabled)
+  EnsureScalarNumber(d.big, "scale", defaults.big.scale)
+  EnsureScalarBoolean(d.big, "pulseLast10", defaults.big.pulseLast10)
+  EnsureScalarBoolean(d.big, "shakeLast5", defaults.big.shakeLast5)
+  EnsureScalarBoolean(d.big, "flashLast5", defaults.big.flashLast5)
+
+  EnsureScalarBoolean(d.banner, "enabled", defaults.banner.enabled)
+
+  EnsureTableKey(d.pull, "point", defaults.pull.point)
+  EnsureScalarBoolean(d.pull, "enabled", defaults.pull.enabled)
+  EnsureScalarNumber(d.pull, "defaultSeconds", defaults.pull.defaultSeconds)
+  EnsureScalarNumber(d.pull, "scale", defaults.pull.scale)
+  EnsureScalarBoolean(d.pull, "soundAt10", defaults.pull.soundAt10)
+  EnsureScalarBoolean(d.pull, "soundLast5", defaults.pull.soundLast5)
+
+  return d, repaired
+end
+
 local function InitDB()
   if db then return db end
   BreakTimerDB = CopyDefaults(defaults, BreakTimerDB or {})
+  if type(BreakTimerDB) ~= "table" then BreakTimerDB = {} end
+  BreakTimerDB, dbRepairedOnLoad = NormalizeDBShape(BreakTimerDB)
   db = BreakTimerDB
+  if type(db.runtime) ~= "table" then db.runtime = {} end
 
   -- Force legacy flags off (in case old DBs had them)
   db.announce = false
@@ -157,6 +233,9 @@ end
 local function BigWarnLocal(msg)
   InitDB()
   if not db.raidWarning then return end
+  if not (RaidNotice_AddMessage and RaidWarningFrame and ChatTypeInfo and ChatTypeInfo["RAID_WARNING"]) then
+    return
+  end
   RaidNotice_AddMessage(RaidWarningFrame, msg, ChatTypeInfo["RAID_WARNING"])
 end
 
@@ -634,6 +713,31 @@ local state = {
   cdStarted = false,
 }
 
+local function ClearPersistedBreakState()
+  InitDB()
+  if type(db.runtime) ~= "table" then db.runtime = {} end
+  db.runtime.activeBreak = nil
+end
+
+local function PersistBreakState()
+  InitDB()
+  if type(db.runtime) ~= "table" then db.runtime = {} end
+
+  if (not state.running) or (state.endServer <= NowServer()) then
+    db.runtime.activeBreak = nil
+    return
+  end
+
+  db.runtime.activeBreak = {
+    startServer = state.startServer,
+    endServer = state.endServer,
+    reason = state.reason or "",
+    caller = state.caller or "",
+    authority = state.authority or 0,
+    cdStarted = state.cdStarted and true or false,
+  }
+end
+
 local function StopTicker()
   if state.ticker then state.ticker:Cancel(); state.ticker = nil end
 end
@@ -783,6 +887,7 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
   state.endLocal = GetTime() + serverDelta
 
   ResetFlags()
+  PersistBreakState()
 
   Bar:Show()
   UpdateBar(RemainingPrecise())
@@ -809,6 +914,7 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
     local remPrecise = RemainingPrecise()
     if remPrecise <= 0 then
       state.running = false
+      ClearPersistedBreakState()
       StopTicker()
       UpdateBar(0)
 
@@ -855,6 +961,7 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
     if whole == 10 and not state.cdStarted and GetGroupChannel() ~= nil then
       if DoBlizzardCountdown10() then
         state.cdStarted = true
+        PersistBreakState()
         SyncSend("COUNTDOWN;" .. tostring(state.startServer))
       else
         SyncSend("CDREQUEST;" .. tostring(state.startServer))
@@ -896,9 +1003,33 @@ local function StartTimer(seconds, reason, silent, fromSync, callerName, authori
   return true
 end
 
+local function RestorePersistedBreakState()
+  InitDB()
+
+  local saved = db.runtime and db.runtime.activeBreak
+  if type(saved) ~= "table" then return false end
+
+  local startServer = tonumber(saved.startServer or 0) or 0
+  local endServer = tonumber(saved.endServer or 0) or 0
+  local reason = saved.reason or ""
+  local caller = saved.caller or ""
+  local authority = tonumber(saved.authority or 0) or 0
+
+  if startServer <= 0 or endServer <= startServer or endServer <= NowServer() then
+    ClearPersistedBreakState()
+    return false
+  end
+
+  StartTimerWithServerTimes(startServer, endServer, reason, caller, authority, true, true)
+  state.cdStarted = saved.cdStarted and true or false
+  PersistBreakState()
+  return true
+end
+
 local function StopTimer(silent, fromSync, callerName)
   InitDB()
   if not state.running then
+    ClearPersistedBreakState()
     CancelBlizzardCountdownBestEffort()
     return
   end
@@ -914,6 +1045,7 @@ local function StopTimer(silent, fromSync, callerName)
   local who = (callerName and callerName ~= "" and callerName) or Ambiguate(UnitName("player") or "", "short")
 
   state.running = false
+  ClearPersistedBreakState()
   StopTicker()
   Bar:Hide()
 
@@ -961,6 +1093,7 @@ local function ExtendTimer(addSeconds, silent, fromSync, callerName)
 
   state.warned10 = false
   state.lastWhole = nil
+  PersistBreakState()
 
   local remPrecise = RemainingPrecise()
   ShowBanner("BREAK EXTENDED", "+" .. FormatTimeFromSeconds(math.floor(addSeconds + 0.5)))
@@ -1129,6 +1262,65 @@ local function ParseInt(tok)
   if not tok or tok == "" then return nil end
   local n = tok:match("^(%d+)$")
   return n and tonumber(n) or nil
+end
+
+local function IsBreakQuery(msg)
+  if type(msg) ~= "string" then return false end
+  local m = msg:lower():gsub("^%s+", ""):gsub("%s+$", "")
+  return m == "!break"
+end
+
+local function IsDesignatedBreakQueryResponder()
+  local me = Ambiguate(UnitName("player") or "", "short")
+  local caller = state.caller or ""
+
+  if caller ~= "" and caller == me then
+    return true
+  end
+
+  if caller ~= "" then
+    return false
+  end
+
+  -- Fallback to group leader if the original caller is not available locally.
+  return UnitIsGroupLeader("player") and true or false
+end
+
+local function ReplyBreakStatusToGroup(channel)
+  if not channel then return end
+  if not state.running then return end
+  if not IsDesignatedBreakQueryResponder() then return end
+  if Throttled("lastBreakReply", 1.0) then return end
+  if type(SendChatMessage) ~= "function" then return end
+
+  local remShow = RemainingDisplaySeconds(RemainingPrecise())
+  local msg = string.format("Break timer: %s remaining", FormatTimeFromSeconds(remShow))
+
+  if state.reason and state.reason ~= "" then
+    msg = msg .. string.format(" (%s)", state.reason)
+  end
+
+  local ok = pcall(SendChatMessage, msg, channel)
+  if not ok then
+    LocalPrint("Unable to send !break reply to group chat.")
+  end
+end
+
+local function HandleBreakQueryChatEvent(event, msg)
+  if not IsBreakQuery(msg) then return end
+  if not state.running then return end
+
+  if event == "CHAT_MSG_PARTY" then
+    ReplyBreakStatusToGroup("PARTY")
+  elseif event == "CHAT_MSG_PARTY_LEADER" then
+    ReplyBreakStatusToGroup("PARTY")
+  elseif event == "CHAT_MSG_RAID" then
+    ReplyBreakStatusToGroup("RAID")
+  elseif event == "CHAT_MSG_RAID_LEADER" then
+    ReplyBreakStatusToGroup("RAID")
+  elseif event == "CHAT_MSG_INSTANCE_CHAT" or event == "CHAT_MSG_INSTANCE_CHAT_LEADER" then
+    ReplyBreakStatusToGroup("INSTANCE_CHAT")
+  end
 end
 
 local function HandleSlash(msg)
@@ -1322,6 +1514,7 @@ local function OnAddonMessage(prefix, text, channel, sender)
       if RemainingPrecise() > 10 then state.cdStarted = false end
       state.warned10 = false
       state.lastWhole = nil
+      PersistBreakState()
 
       local remPrecise = RemainingPrecise()
       ShowBanner("BREAK EXTENDED", "+" .. FormatTimeFromSeconds(add))
@@ -1339,6 +1532,7 @@ local function OnAddonMessage(prefix, text, channel, sender)
     if state.running and startServer == state.startServer and not state.cdStarted then
       if DoBlizzardCountdown10() then
         state.cdStarted = true
+        PersistBreakState()
         SyncSend("COUNTDOWN;" .. tostring(state.startServer))
       end
     end
@@ -1349,6 +1543,7 @@ local function OnAddonMessage(prefix, text, channel, sender)
     local startServer = tonumber(a or 0) or 0
     if state.running and startServer == state.startServer then
       state.cdStarted = true
+      PersistBreakState()
     end
     return
   end
@@ -1380,6 +1575,12 @@ end
 local f = CreateFrame("Frame")
 f:RegisterEvent("ADDON_LOADED")
 f:RegisterEvent("CHAT_MSG_ADDON")
+f:RegisterEvent("CHAT_MSG_PARTY")
+f:RegisterEvent("CHAT_MSG_PARTY_LEADER")
+f:RegisterEvent("CHAT_MSG_RAID")
+f:RegisterEvent("CHAT_MSG_RAID_LEADER")
+f:RegisterEvent("CHAT_MSG_INSTANCE_CHAT")
+f:RegisterEvent("CHAT_MSG_INSTANCE_CHAT_LEADER")
 f:RegisterEvent("GROUP_ROSTER_UPDATE")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
 
@@ -1399,10 +1600,25 @@ f:SetScript("OnEvent", function(self, event, ...)
 
     C_ChatInfo.RegisterAddonMessagePrefix(PREFIX)
 
+    RestorePersistedBreakState()
+
+    if dbRepairedOnLoad then
+      LocalPrint("Saved settings were repaired due to malformed values.")
+      dbRepairedOnLoad = false
+    end
+
     LocalPrint("loaded. /break [minutes] [reason]  (aliases: /breaktimer /breaktime /bt)  |  /pull [seconds]")
   elseif event == "CHAT_MSG_ADDON" then
     local prefix, text, channel, sender = ...
     OnAddonMessage(prefix, text, channel, sender)
+  elseif event == "CHAT_MSG_PARTY"
+    or event == "CHAT_MSG_PARTY_LEADER"
+    or event == "CHAT_MSG_RAID"
+    or event == "CHAT_MSG_RAID_LEADER"
+    or event == "CHAT_MSG_INSTANCE_CHAT"
+    or event == "CHAT_MSG_INSTANCE_CHAT_LEADER" then
+    local msg = ...
+    HandleBreakQueryChatEvent(event, msg)
   elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
     if GetGroupChannel() ~= nil then
       SendHello()

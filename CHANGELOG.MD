@@ -4,6 +4,17 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [Unreleased]
+### Fixed
+- Active break timers now persist through `/reload` by saving the running break state and restoring it on addon load if it has not expired.
+- Hardened saved-variable access paths against malformed data to prevent table-index Lua errors in core runtime and options.
+- Added startup saved-variable self-healing that normalizes malformed values and shows one local repair notice when fixes were applied.
+
+### Added
+- Added `!break` group chat query support. While a break is active, typing `!break` in party/raid/instance chat posts the remaining time.
+
+---
+
 ## [1.2.5] - 2026-02-05
 ### Added
 - Added **/pull [seconds]** (defaults to 10 seconds):
