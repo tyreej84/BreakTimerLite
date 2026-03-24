@@ -1,6 +1,6 @@
 -- Core.lua
 -- Break Timer Lite
--- v1.2.6
+-- v1.2.7
 -- NO CHAT OUTPUT EVER (no PARTY/RAID/INSTANCE_CHAT spam)
 --
 -- Fixes:
@@ -28,7 +28,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.2.6"
+local ADDON_VERSION = "1.2.7"
 local dbRepairedOnLoad = false
 
 local defaults = {
@@ -1266,7 +1266,9 @@ end
 
 local function IsBreakQuery(msg)
   if type(msg) ~= "string" then return false end
-  local m = msg:lower():gsub("^%s+", ""):gsub("%s+$", "")
+  local m = strlower(msg)
+  m = string.gsub(m, "^%s+", "")
+  m = string.gsub(m, "%s+$", "")
   return m == "!break"
 end
 

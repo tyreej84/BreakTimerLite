@@ -4,6 +4,10 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.2.7] - 2026-03-24
+### Fixed
+- Fixed a Lua taint/index error in `!break` query parsing by avoiding method-style calls on chat message values and normalizing with safe string APIs.
+
 ## [1.2.6] - 2026-03-18
 ### Fixed
 - Active break timers now persist through `/reload` by saving the running break state and restoring it on addon load if it has not expired.
