@@ -4,6 +4,18 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.2.10] - 2026-03-25
+### Changed
+- `!break` replies are now restricted to a single responder: only the player who started the active break timer.
+
+## [1.2.9] - 2026-03-25
+### Changed
+- `!break` status replies are no longer restricted to a single designated responder, so queries from the break starter are also answered reliably.
+
+## [1.2.8] - 2026-03-25
+### Fixed
+- Hardened addon-message self-filtering to compare short names, preventing accidental processing of self-sent sync messages when sender names include realm suffixes.
+
 ## [1.2.7] - 2026-03-24
 ### Fixed
 - Fixed a Lua taint/index error in `!break` query parsing by avoiding method-style calls on chat message values and normalizing with safe string APIs.

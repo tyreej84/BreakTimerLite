@@ -1,6 +1,6 @@
 -- Core.lua
 -- Break Timer Lite
--- v1.2.7
+-- v1.2.10
 -- NO CHAT OUTPUT EVER (no PARTY/RAID/INSTANCE_CHAT spam)
 --
 -- Fixes:
@@ -28,7 +28,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.2.7"
+local ADDON_VERSION = "1.2.10"
 local dbRepairedOnLoad = false
 
 local defaults = {
@@ -1275,17 +1275,7 @@ end
 local function IsDesignatedBreakQueryResponder()
   local me = Ambiguate(UnitName("player") or "", "short")
   local caller = state.caller or ""
-
-  if caller ~= "" and caller == me then
-    return true
-  end
-
-  if caller ~= "" then
-    return false
-  end
-
-  -- Fallback to group leader if the original caller is not available locally.
-  return UnitIsGroupLeader("player") and true or false
+  return caller ~= "" and caller == me
 end
 
 local function ReplyBreakStatusToGroup(channel)
@@ -1437,7 +1427,7 @@ end
 
 local function OnAddonMessage(prefix, text, channel, sender)
   if prefix ~= PREFIX then return end
-  if sender == UnitName("player") then return end
+  if Ambiguate(sender or "", "short") == Ambiguate(UnitName("player") or "", "short") then return end
   if type(text) ~= "string" then return end
 
   local senderShort = Ambiguate(sender, "short")
