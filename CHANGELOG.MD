@@ -4,6 +4,10 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.2.11] - 2026-03-29
+### Fixed
+- Prevented a secret-string taint error in `!break` chat query handling by adding a safe direct comparison path and protecting normalization against forbidden string conversions.
+
 ## [1.2.10] - 2026-03-25
 ### Changed
 - `!break` replies are now restricted to a single responder: only the player who started the active break timer.

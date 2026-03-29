@@ -1266,10 +1266,18 @@ end
 
 local function IsBreakQuery(msg)
   if type(msg) ~= "string" then return false end
-  local m = strlower(msg)
-  m = string.gsub(m, "^%s+", "")
-  m = string.gsub(m, "%s+$", "")
-  return m == "!break"
+
+  -- Secret chat strings can fail conversion/normalization APIs; keep a safe fast path.
+  if msg == "!break" then return true end
+
+  local ok, normalized = pcall(function()
+    local m = string.lower(msg)
+    m = string.gsub(m, "^%s+", "")
+    m = string.gsub(m, "%s+$", "")
+    return m
+  end)
+
+  return ok and normalized == "!break"
 end
 
 local function IsDesignatedBreakQueryResponder()
