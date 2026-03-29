@@ -4,7 +4,7 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
-## [1.2.11] - 2026-03-29
+## [1.3.0] - 2026-03-29
 ### Fixed
 - Prevented a secret-string taint error in `!break` chat query handling by adding a safe direct comparison path and protecting normalization against forbidden string conversions.
 
