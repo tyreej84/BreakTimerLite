@@ -1,6 +1,6 @@
 -- Core.lua
 -- Break Timer Lite
--- v1.3.4
+-- v1.3.5
 -- NO CHAT OUTPUT EVER (no PARTY/RAID/INSTANCE_CHAT spam)
 --
 -- Fixes:
@@ -28,7 +28,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.3.4"
+local ADDON_VERSION = "1.3.5"
 local dbRepairedOnLoad = false
 
 local defaults = {
@@ -210,6 +210,94 @@ local function SafePlaySound(soundKitID, channel)
   return false
 end
 
+local ADDON_MESSAGE_MAX_LEN = 255
+
+local function SanitizeText(value, maxLen)
+  value = tostring(value or "")
+  value = string.gsub(value, "[%c]", " ")
+  value = string.gsub(value, "[|;]", "/")
+  value = string.gsub(value, "%s+", " ")
+  value = string.gsub(value, "^%s+", "")
+  value = string.gsub(value, "%s+$", "")
+  if maxLen and #value > maxLen then
+    value = string.sub(value, 1, maxLen)
+  end
+  return value
+end
+
+local function BuildSyncPayload(action, ...)
+  local parts = { tostring(action or "") }
+  for i = 1, select("#", ...) do
+    local value = select(i, ...)
+    if type(value) == "number" then
+      parts[#parts + 1] = tostring(value)
+    else
+      parts[#parts + 1] = SanitizeText(value, 48)
+    end
+  end
+
+  local payload = table.concat(parts, ";")
+  if #payload > ADDON_MESSAGE_MAX_LEN then
+    payload = string.sub(payload, 1, ADDON_MESSAGE_MAX_LEN)
+  end
+  return payload
+end
+
+local function IsAddonAPIResultSuccess(result, enumTable)
+  if result == nil or result == true then return true end
+  if result == false then return false end
+  if type(result) == "number" then
+    if result == 0 then return true end
+    if enumTable and enumTable.Success and result == enumTable.Success then return true end
+  end
+  return false
+end
+
+local function SafeRegisterAddonPrefix()
+  if not (C_ChatInfo and type(C_ChatInfo.RegisterAddonMessagePrefix) == "function") then
+    return false, "missing-api"
+  end
+
+  local ok, result = pcall(C_ChatInfo.RegisterAddonMessagePrefix, PREFIX)
+  if not ok then
+    return false, tostring(result or "register-error")
+  end
+
+  if IsAddonAPIResultSuccess(result, Enum and Enum.RegisterAddonMessagePrefixResult) then
+    return true, result
+  end
+
+  if type(result) == "number" then
+    local dup = Enum and Enum.RegisterAddonMessagePrefixResult and Enum.RegisterAddonMessagePrefixResult.DuplicatePrefix
+    if result == 1 or (dup and result == dup) then
+      return true, result
+    end
+  end
+
+  return false, result
+end
+
+local function SafeSendAddonPayload(payload, channel, target, preferLogged)
+  if not (C_ChatInfo and type(C_ChatInfo.SendAddonMessage) == "function") then
+    return false, "missing-api"
+  end
+  if type(payload) ~= "string" or payload == "" or #payload > ADDON_MESSAGE_MAX_LEN then
+    return false, "invalid-message"
+  end
+
+  local sendFunc = C_ChatInfo.SendAddonMessage
+  if preferLogged and type(C_ChatInfo.SendAddonMessageLogged) == "function" then
+    sendFunc = C_ChatInfo.SendAddonMessageLogged
+  end
+
+  local ok, result = pcall(sendFunc, PREFIX, payload, channel, target)
+  if not ok then
+    return false, tostring(result or "send-error")
+  end
+
+  return IsAddonAPIResultSuccess(result, Enum and Enum.SendAddonMessageResult), result
+end
+
 -- ------------------------------------------------------------
 -- Helpers
 -- ------------------------------------------------------------
@@ -328,11 +416,11 @@ end
 -- ------------------------------------------------------------
 -- Addon Sync send (addon messages only, NOT chat)
 -- ------------------------------------------------------------
-local function SyncSend(payload)
+local function SyncSend(payload, preferLogged)
   local ch = GetGroupChannel()
-  if not ch then return end
-  if Throttled("lastSync", 0.25) then return end
-  C_ChatInfo.SendAddonMessage(PREFIX, payload, ch)
+  if not ch then return false end
+  if Throttled("lastSync", 0.25) then return false, "throttled-local" end
+  return SafeSendAddonPayload(payload, ch, nil, preferLogged)
 end
 
 -- ------------------------------------------------------------
@@ -358,11 +446,12 @@ local function DoBlizzardCountdown(seconds)
   if GetGroupChannel() == nil then return false, "no-group" end
   if not IsPrivilegedLocal() then return false, "not-privileged" end
 
-  local ok, err = pcall(function()
-    C_PartyInfo.DoCountdown(seconds)
-  end)
+  local ok, success = pcall(C_PartyInfo.DoCountdown, seconds)
   if not ok then
-    return DisableBlizzardCountdown(tostring(err or "api-error"))
+    return DisableBlizzardCountdown(tostring(success or "api-error"))
+  end
+  if success == false then
+    return false, "api-rejected"
   end
 
   return true
@@ -881,7 +970,11 @@ local function TryReadyCheck()
   InitDB()
   if not db.readyCheckOnEnd then return end
   if not IsPrivilegedLocal() then return end
-  if type(DoReadyCheck) == "function" then DoReadyCheck() end
+  if C_PartyInfo and type(C_PartyInfo.DoReadyCheck) == "function" then
+    C_PartyInfo.DoReadyCheck()
+  elseif type(DoReadyCheck) == "function" then
+    DoReadyCheck()
+  end
 end
 
 local function ShouldAcceptRemote(startServer, authorityRank)
@@ -906,8 +999,8 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
   state.startServer = startServer
   state.endServer = endServer
   state.duration = seconds
-  state.reason = reason or ""
-  state.caller = caller or ""
+  state.reason = SanitizeText(reason or "", 80)
+  state.caller = SanitizeText(caller or "", 24)
   state.authority = authority or 0
 
   local serverDelta = endServer - NowServer()
@@ -1006,15 +1099,17 @@ local function StartTimer(seconds, reason, silent, fromSync, callerName, authori
     return false
   end
 
+  reason = SanitizeText(reason or "", 80)
   local caller = callerName and callerName ~= "" and callerName or Ambiguate(UnitName("player") or "", "short")
+  caller = SanitizeText(caller, 24)
   local auth = authorityRank or LocalAuthorityRank()
   local startServer = startServerOverride or NowServer()
   local endServer = startServer + math.floor(seconds + 0.5)
 
-  StartTimerWithServerTimes(startServer, endServer, reason or "", caller, auth, silent, fromSync)
+  StartTimerWithServerTimes(startServer, endServer, reason, caller, auth, silent, fromSync)
 
   if grouped and not fromSync then
-    SyncSend(string.format("START;%d;%d;%s;%s;%d;%s", startServer, endServer, reason or "", caller, auth, ADDON_VERSION))
+    SyncSend(BuildSyncPayload("START", startServer, endServer, reason, caller, auth, ADDON_VERSION), true)
   end
 
   return true
@@ -1060,6 +1155,7 @@ local function StopTimer(silent, fromSync, callerName)
   if not fromSync then CancelBlizzardCountdownBestEffort() end
 
   local who = (callerName and callerName ~= "" and callerName) or Ambiguate(UnitName("player") or "", "short")
+  who = SanitizeText(who, 24)
 
   state.running = false
   ClearPersistedBreakState()
@@ -1079,7 +1175,7 @@ local function StopTimer(silent, fromSync, callerName)
   BigWarnLocal("BREAK CANCELED! (" .. who .. ")")
 
   if grouped and not fromSync then
-    SyncSend("STOP;" .. who)
+    SyncSend(BuildSyncPayload("STOP", who))
   end
 end
 
@@ -1095,6 +1191,7 @@ local function ExtendTimer(addSeconds, silent, fromSync, callerName)
   end
 
   local who = (callerName and callerName ~= "" and callerName) or Ambiguate(UnitName("player") or "", "short")
+  who = SanitizeText(who, 24)
 
   if not state.running then
     return StartTimer(addSeconds, state.reason or "", silent, fromSync, who)
@@ -1119,7 +1216,7 @@ local function ExtendTimer(addSeconds, silent, fromSync, callerName)
   UpdateBig(remPrecise, RemainingDisplaySeconds(remPrecise))
 
   if grouped and not fromSync then
-    SyncSend(string.format("EXTEND;%d;%s;%d;%d", math.floor(addSeconds + 0.5), who, state.startServer, state.endServer))
+    SyncSend(BuildSyncPayload("EXTEND", math.floor(addSeconds + 0.5), who, state.startServer, state.endServer))
   end
 
   return true
@@ -1184,7 +1281,7 @@ local function StartPullLocal(seconds, starterShort, fromSync)
   seconds = math.floor(seconds + 0.5)
 
   pullState.running = true
-  pullState.startedBy = starterShort or ""
+  pullState.startedBy = SanitizeText(starterShort or "", 24)
   pullState.lastWhole = nil
   pullState.endLocal = GetTime() + seconds
 
@@ -1235,6 +1332,7 @@ local function StartPull(seconds, fromSync, senderName, senderAuth)
   end
 
   local starter = senderName and senderName ~= "" and senderName or Ambiguate(UnitName("player") or "", "short")
+  starter = SanitizeText(starter, 24)
 
   -- Start Blizzard countdown text if we can (leader/assist only)
   if grouped and not fromSync then
@@ -1247,7 +1345,8 @@ local function StartPull(seconds, fromSync, senderName, senderAuth)
   -- Sync to group so everyone sees big numbers aligned
   if grouped and not fromSync then
     local startServer = NowServer()
-    SyncSend(string.format("PULL;%d;%d;%s;%d;%s",
+    SyncSend(BuildSyncPayload(
+      "PULL",
       startServer,
       seconds,
       starter,
@@ -1439,22 +1538,28 @@ end
 local function SendHello()
   if Throttled("lastHello", 5.0) then return end
   if GetGroupChannel() == nil then return end
-  SyncSend("HELLO;" .. ADDON_VERSION)
+  SyncSend(BuildSyncPayload("HELLO", ADDON_VERSION))
 end
 
 local function RequestState()
   if Throttled("lastRequest", 2.0) then return end
   if GetGroupChannel() == nil then return end
-  SyncSend("REQUEST;" .. ADDON_VERSION)
+  SyncSend(BuildSyncPayload("REQUEST", ADDON_VERSION))
 end
 
 local function SendStateTo(channel, target)
   if not state.running then return end
-  local payload = string.format("STATE;%d;%d;%s;%s;%d;%s;%d",
-    state.startServer, state.endServer, state.reason or "", state.caller or "",
-    state.authority or 0, ADDON_VERSION, (state.cdStarted and 1 or 0)
+  local payload = BuildSyncPayload(
+    "STATE",
+    state.startServer,
+    state.endServer,
+    state.reason or "",
+    state.caller or "",
+    state.authority or 0,
+    ADDON_VERSION,
+    (state.cdStarted and 1 or 0)
   )
-  C_ChatInfo.SendAddonMessage(PREFIX, payload, channel, target)
+  SafeSendAddonPayload(payload, channel, target, true)
 end
 
 local function OnAddonMessage(prefix, text, channel, sender)
@@ -1462,7 +1567,7 @@ local function OnAddonMessage(prefix, text, channel, sender)
   if Ambiguate(sender or "", "short") == Ambiguate(UnitName("player") or "", "short") then return end
   if type(text) ~= "string" then return end
 
-  local senderShort = Ambiguate(sender, "short")
+  local senderShort = SanitizeText(Ambiguate(sender or "", "short"), 24)
   local auth = SenderAuthorityRank(sender)
 
   local action, a, b, c, d, e, f, g = strsplit(";", text)
@@ -1608,7 +1713,10 @@ f:SetScript("OnEvent", function(self, event, ...)
     SetPullPoint()
     SetPullScale()
 
-    C_ChatInfo.RegisterAddonMessagePrefix(PREFIX)
+    local prefixOK = SafeRegisterAddonPrefix()
+    if not prefixOK then
+      LocalPrint("Warning: addon sync prefix could not be registered on this client.")
+    end
 
     RestorePersistedBreakState()
 

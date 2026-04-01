@@ -4,6 +4,10 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.3.5] - 2026-04-01
+### Fixed
+- Hardened Blizzard API integration by validating modern addon-message return codes, sanitizing sync payloads, and using safer countdown/ready-check fallbacks.
+
 ## [1.3.4] - 2026-04-01
 ### Changed
 - Removed the automatic Blizzard 10-second `/cd` countdown from break timers so the addon now relies only on its own built-in timer visuals/sounds at the end of a break.
