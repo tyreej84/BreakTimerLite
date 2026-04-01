@@ -2,7 +2,7 @@
 
 A lightweight, synced break + pull timer addon for World of Warcraft.
 
-**Break Timer Lite** is designed to feel like a polished, purpose-built timer utility: one person starts it, everyone with the addon sees the same timer, and it can trigger Blizzard’s built-in countdown text and a Ready Check — **without spamming group chat**.
+**Break Timer Lite** is designed to feel like a polished, purpose-built timer utility: one person starts it, everyone with the addon sees the same timer, and it can trigger a Ready Check at the end — **without spamming group chat**.
 
 ---
 
@@ -28,8 +28,8 @@ Break Timer Lite works best when everyone in your party or raid has the addon in
   - **White text** for maximum readability
 - **Big break countdown (optional)**
   - Large center-screen countdown with last-seconds polish (pulse/shake/flash options)
-- **Blizzard countdown at 10 seconds (break timer)**
-  - At **10 seconds remaining**, the break timer triggers Blizzard’s built-in countdown text
+- **Local-only final seconds (break timer)**
+  - The break timer stays on the addon's own visuals and sounds at the end instead of triggering Blizzard's built-in `/cd` text
 - **Automatic Ready Check**
   - When the break completes, the addon **automatically starts a Ready Check**
   - Requires **Party Leader / Raid Leader / Raid Assistant**
@@ -111,7 +111,7 @@ Starts a 10-second pull countdown (default)
 `/pull 8`  
 Starts an 8-second pull countdown
 
-> Note: While grouped, starting Blizzard’s built-in countdown requires leader/assist permissions, but the on-screen pull numbers are still shown locally and synced to other addon users.
+> Note: Only `/pull` uses Blizzard’s built-in countdown text when available. Break timers now stay on Break Timer Lite’s own visuals and sounds through the final seconds.
 
 ---
 
@@ -163,9 +163,10 @@ Available options include:
 
 ## Notes
 
-- Blizzard’s countdown text and the **Ready Check** require:
+- Blizzard’s countdown text is used for **`/pull` only**, and requires:
   - Being in a party or raid
   - Having leader or assist permissions
+- Automatic **Ready Check** at break end also requires the appropriate leader/assist permissions.
 - The addon’s notifications (banners, raid warning frame messages, big numbers) are **local-only** and **never** sent to group chat.
 
 ---

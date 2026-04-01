@@ -1,6 +1,6 @@
 -- Core.lua
 -- Break Timer Lite
--- v1.3.0
+-- v1.3.4
 -- NO CHAT OUTPUT EVER (no PARTY/RAID/INSTANCE_CHAT spam)
 --
 -- Fixes:
@@ -28,7 +28,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.3.0"
+local ADDON_VERSION = "1.3.4"
 local dbRepairedOnLoad = false
 
 local defaults = {
@@ -336,31 +336,58 @@ local function SyncSend(payload)
 end
 
 -- ------------------------------------------------------------
--- Blizzard countdown text (same as /cd 10)
+-- Blizzard countdown text support (/pull only)
 -- ------------------------------------------------------------
-local function DoBlizzardCountdown(seconds)
-  seconds = tonumber(seconds)
-  if not seconds or seconds <= 0 then return false end
-  if not (C_PartyInfo and C_PartyInfo.DoCountdown) then return false end
-  if GetGroupChannel() == nil then return false end
-  if not IsPrivilegedLocal() then return false end
-  C_PartyInfo.DoCountdown(seconds)
-  return true
+local blizzardCountdownUsable = true
+local blizzardCountdownWarned = false
+
+local function DisableBlizzardCountdown(reason)
+  blizzardCountdownUsable = false
+  if not blizzardCountdownWarned then
+    blizzardCountdownWarned = true
+    LocalPrint("Blizzard countdown text failed on this client; using local timer visuals only.")
+  end
+  return false, reason or "api-error"
 end
 
-local function DoBlizzardCountdown10()
-  return DoBlizzardCountdown(10)
+local function DoBlizzardCountdown(seconds)
+  seconds = tonumber(seconds)
+  if not seconds or seconds <= 0 then return false, "bad-seconds" end
+  if not blizzardCountdownUsable then return false, "disabled" end
+  if not (C_PartyInfo and type(C_PartyInfo.DoCountdown) == "function") then return false, "missing-api" end
+  if GetGroupChannel() == nil then return false, "no-group" end
+  if not IsPrivilegedLocal() then return false, "not-privileged" end
+
+  local ok, err = pcall(function()
+    C_PartyInfo.DoCountdown(seconds)
+  end)
+  if not ok then
+    return DisableBlizzardCountdown(tostring(err or "api-error"))
+  end
+
+  return true
 end
 
 local function CancelBlizzardCountdownBestEffort()
   if GetGroupChannel() == nil then return end
   if not IsPrivilegedLocal() then return end
-  if not C_PartyInfo then return end
+  if not C_PartyInfo or not blizzardCountdownUsable then return end
 
+  local ok, err
   if type(C_PartyInfo.CancelCountdown) == "function" then
-    C_PartyInfo.CancelCountdown()
+    ok, err = pcall(function()
+      C_PartyInfo.CancelCountdown()
+    end)
   elseif type(C_PartyInfo.DoCountdown) == "function" then
-    C_PartyInfo.DoCountdown(0)
+    ok, err = pcall(function()
+      C_PartyInfo.DoCountdown(0)
+    end)
+  else
+    return
+  end
+
+  if not ok then
+    DisableBlizzardCountdown(tostring(err or "cancel-error"))
   end
 end
 
@@ -958,16 +985,6 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
       Beep()
     end
 
-    if whole == 10 and not state.cdStarted and GetGroupChannel() ~= nil then
-      if DoBlizzardCountdown10() then
-        state.cdStarted = true
-        PersistBreakState()
-        SyncSend("COUNTDOWN;" .. tostring(state.startServer))
-      else
-        SyncSend("CDREQUEST;" .. tostring(state.startServer))
-      end
-    end
-
     if state.lastWhole ~= whole then
       if whole == 3 then Beep() end
       if whole == 1 then Beep() end
@@ -1267,23 +1284,30 @@ end
 local function IsBreakQuery(msg)
   if type(msg) ~= "string" then return false end
 
-  -- Secret chat strings can fail conversion/normalization APIs; keep a safe fast path.
-  if msg == "!break" then return true end
+  -- Secret chat strings can throw on direct comparison/conversion operations.
+  local okExact, isExact = pcall(function()
+    return msg == "!break"
+  end)
+  if okExact and isExact then return true end
 
-  local ok, normalized = pcall(function()
+  local okNormalized, isBreak = pcall(function()
     local m = string.lower(msg)
     m = string.gsub(m, "^%s+", "")
     m = string.gsub(m, "%s+$", "")
-    return m
+    return m == "!break"
   end)
 
-  return ok and normalized == "!break"
+  return okNormalized and isBreak
 end
 
-local function IsDesignatedBreakQueryResponder()
+local function IsDesignatedBreakOwner()
   local me = Ambiguate(UnitName("player") or "", "short")
   local caller = state.caller or ""
   return caller ~= "" and caller == me
+end
+
+local function IsDesignatedBreakQueryResponder()
+  return IsDesignatedBreakOwner()
 end
 
 local function ReplyBreakStatusToGroup(channel)
@@ -1410,7 +1434,7 @@ SlashCmdList["BREAKTIMERLITEPULL"] = function(msg)
 end
 
 -- ------------------------------------------------------------
--- Version handshake + late-join sync + countdown request/confirm
+-- Version handshake + late-join sync
 -- ------------------------------------------------------------
 local function SendHello()
   if Throttled("lastHello", 5.0) then return end
@@ -1527,24 +1551,10 @@ local function OnAddonMessage(prefix, text, channel, sender)
   end
 
   if action == "CDREQUEST" then
-    if not IsPrivilegedLocal() then return end
-    local startServer = tonumber(a or 0) or 0
-    if state.running and startServer == state.startServer and not state.cdStarted then
-      if DoBlizzardCountdown10() then
-        state.cdStarted = true
-        PersistBreakState()
-        SyncSend("COUNTDOWN;" .. tostring(state.startServer))
-      end
-    end
     return
   end
 
   if action == "COUNTDOWN" then
-    local startServer = tonumber(a or 0) or 0
-    if state.running and startServer == state.startServer then
-      state.cdStarted = true
-      PersistBreakState()
-    end
     return
   end
 

@@ -4,6 +4,22 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.3.4] - 2026-04-01
+### Changed
+- Removed the automatic Blizzard 10-second `/cd` countdown from break timers so the addon now relies only on its own built-in timer visuals/sounds at the end of a break.
+
+## [1.3.3] - 2026-04-01
+### Fixed
+- Guarded Blizzard's group countdown API so a client-side `mgt.clearMarks is not a function` failure no longer throws from the addon; it now falls back to local visuals instead of repeatedly re-triggering the broken countdown path.
+
+## [1.3.2] - 2026-03-31
+### Fixed
+- Stopped every assist-capable client from trying to fire the final 10-second Blizzard countdown during a break; only the player who started the break now initiates it, with the guarded sync fallback still preserved.
+
+## [1.3.1] - 2026-03-30
+### Fixed
+- Prevented a follow-up secret-string taint compare fault in `!break` query detection by protecting the exact-match check with a guarded comparison path.
+
 ## [1.3.0] - 2026-03-29
 ### Fixed
 - Prevented a secret-string taint error in `!break` chat query handling by adding a safe direct comparison path and protecting normalization against forbidden string conversions.
