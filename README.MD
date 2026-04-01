@@ -2,7 +2,7 @@
 
 A lightweight, synced break + pull timer addon for World of Warcraft.
 
-**Break Timer Lite** is designed to feel like a polished, purpose-built timer utility: one person starts it, everyone with the addon sees the same timer, and it can trigger a Ready Check at the end — **without spamming group chat**.
+**Break Timer Lite** is designed to feel like a polished, purpose-built timer utility: one person starts it, everyone with the addon sees the same timer, and it can trigger a Ready Check at the end.
 
 ---
 
@@ -20,9 +20,8 @@ Break Timer Lite works best when everyone in your party or raid has the addon in
 - **Leader/assist control**
   - In parties: **Party Leader** can start/extend/stop
   - In raids: **Raid Leader or Assistant** can start/extend/stop
-- **No chat spam**
-  - Break Timer Lite sends **no PARTY / RAID / INSTANCE chat messages**
-  - All notifications are **local-only** (screen banners, Raid Warning frame, sounds)
+- **Local notifications**
+  - Screen banners, Raid Warning text, and sounds stay on the player’s client
 - **Sleek timer bar**
   - Translucent black container with a blue progress fill
   - **White text** for maximum readability
@@ -47,7 +46,7 @@ Break Timer Lite works best when everyone in your party or raid has the addon in
 
 - **/pull countdown (synced)**
   - `/pull [seconds]` starts a pull countdown (defaults to **10 seconds**)
-  - Shows **big on-screen numbers** locally for the pull timer (no chat)
+  - Shows **big on-screen numbers** locally for the pull timer
   - Plays an alert at **10 seconds**, and again at **5, 4, 3, 2, 1**
   - When possible, also starts Blizzard’s built-in countdown text for the same duration
   - Synced via addon messages so everyone’s pull numbers align
@@ -167,7 +166,7 @@ Available options include:
   - Being in a party or raid
   - Having leader or assist permissions
 - Automatic **Ready Check** at break end also requires the appropriate leader/assist permissions.
-- The addon’s notifications (banners, raid warning frame messages, big numbers) are **local-only** and **never** sent to group chat.
+- The addon’s notifications (banners, raid warning frame messages, big numbers) are **local-only**.
 
 ---
 
