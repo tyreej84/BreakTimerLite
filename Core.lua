@@ -1,7 +1,7 @@
 -- Core.lua
 -- Break Timer Lite
--- v1.3.5
--- NO CHAT OUTPUT EVER (no PARTY/RAID/INSTANCE_CHAT spam)
+-- v1.3.6
+-- No proactive chat spam (only explicit !break status replies when allowed)
 --
 -- Fixes:
 --  - Sound API compatibility: SafePlaySound() supports modern C_Sound.PlaySound(params)
@@ -28,7 +28,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.3.5"
+local ADDON_VERSION = "1.3.6"
 local dbRepairedOnLoad = false
 
 local defaults = {
@@ -298,6 +298,15 @@ local function SafeSendAddonPayload(payload, channel, target, preferLogged)
   return IsAddonAPIResultSuccess(result, Enum and Enum.SendAddonMessageResult), result
 end
 
+local function IsAddonMessageLockdownResult(result)
+  if type(result) == "number" then
+    local lockdown = Enum and Enum.SendAddonMessageResult and Enum.SendAddonMessageResult.AddOnMessageLockdown
+    if lockdown and result == lockdown then return true end
+    if result == 11 then return true end
+  end
+  return false
+end
+
 -- ------------------------------------------------------------
 -- Helpers
 -- ------------------------------------------------------------
@@ -405,6 +414,7 @@ end
 -- Throttle
 -- ------------------------------------------------------------
 local throttle = { lastSync = 0, lastHello = 0, lastRequest = 0 }
+local pendingSyncPayloads = {}
 local function Throttled(key, window)
   window = window or 0.6
   local t = GetTime()
@@ -420,7 +430,15 @@ local function SyncSend(payload, preferLogged)
   local ch = GetGroupChannel()
   if not ch then return false end
   if Throttled("lastSync", 0.25) then return false, "throttled-local" end
-  return SafeSendAddonPayload(payload, ch, nil, preferLogged)
+  local ok, result = SafeSendAddonPayload(payload, ch, nil, preferLogged)
+  if not ok and IsAddonMessageLockdownResult(result) then
+    local action = payload:match("^([^;]+);") or "GENERIC"
+    pendingSyncPayloads[action] = {
+      payload = payload,
+      preferLogged = preferLogged and true or false,
+    }
+  end
+  return ok, result
 end
 
 -- ------------------------------------------------------------
@@ -827,6 +845,7 @@ local state = {
   shakeSeed = 0,
 
   cdStarted = false,
+  pendingBreakReplyChannel = nil,
 }
 
 local function ClearPersistedBreakState()
@@ -1141,6 +1160,8 @@ end
 local function StopTimer(silent, fromSync, callerName)
   InitDB()
   if not state.running then
+    state.pendingBreakReplyChannel = nil
+    pendingSyncPayloads = {}
     ClearPersistedBreakState()
     CancelBlizzardCountdownBestEffort()
     return
@@ -1158,6 +1179,8 @@ local function StopTimer(silent, fromSync, callerName)
   who = SanitizeText(who, 24)
 
   state.running = false
+  state.pendingBreakReplyChannel = nil
+  pendingSyncPayloads = {}
   ClearPersistedBreakState()
   StopTicker()
   Bar:Hide()
@@ -1409,11 +1432,23 @@ local function IsDesignatedBreakQueryResponder()
   return IsDesignatedBreakOwner()
 end
 
+local function BreakQueryChannelForEvent(event)
+  if event == "CHAT_MSG_PARTY" or event == "CHAT_MSG_PARTY_LEADER" then
+    return "PARTY"
+  elseif event == "CHAT_MSG_RAID" or event == "CHAT_MSG_RAID_LEADER" then
+    return "RAID"
+  elseif event == "CHAT_MSG_INSTANCE_CHAT" or event == "CHAT_MSG_INSTANCE_CHAT_LEADER" then
+    return "INSTANCE_CHAT"
+  end
+  return nil
+end
+
 local function ReplyBreakStatusToGroup(channel)
   if not channel then return end
   if not state.running then return end
   if not IsDesignatedBreakQueryResponder() then return end
   if Throttled("lastBreakReply", 1.0) then return end
+  if InCombatLockdown and InCombatLockdown() then return end
   if type(SendChatMessage) ~= "function" then return end
 
   local remShow = RemainingDisplaySeconds(RemainingPrecise())
@@ -1429,21 +1464,50 @@ local function ReplyBreakStatusToGroup(channel)
   end
 end
 
+local function QueueBreakReplyAfterCombat(channel)
+  if not channel then return end
+  if not state.running then return end
+  if not IsDesignatedBreakQueryResponder() then return end
+  state.pendingBreakReplyChannel = channel
+end
+
+local function FlushQueuedBreakReplyAfterCombat()
+  local channel = state.pendingBreakReplyChannel
+  if not channel then return end
+  state.pendingBreakReplyChannel = nil
+  ReplyBreakStatusToGroup(channel)
+end
+
+local function FlushQueuedSyncPayloadsAfterCombat()
+  local ch = GetGroupChannel()
+  if not ch then
+    pendingSyncPayloads = {}
+    return
+  end
+
+  local queued = pendingSyncPayloads
+  pendingSyncPayloads = {}
+
+  for _, item in pairs(queued) do
+    if type(item) == "table" and type(item.payload) == "string" and item.payload ~= "" then
+      SafeSendAddonPayload(item.payload, ch, nil, item.preferLogged)
+    end
+  end
+end
+
 local function HandleBreakQueryChatEvent(event, msg)
   if not IsBreakQuery(msg) then return end
   if not state.running then return end
 
-  if event == "CHAT_MSG_PARTY" then
-    ReplyBreakStatusToGroup("PARTY")
-  elseif event == "CHAT_MSG_PARTY_LEADER" then
-    ReplyBreakStatusToGroup("PARTY")
-  elseif event == "CHAT_MSG_RAID" then
-    ReplyBreakStatusToGroup("RAID")
-  elseif event == "CHAT_MSG_RAID_LEADER" then
-    ReplyBreakStatusToGroup("RAID")
-  elseif event == "CHAT_MSG_INSTANCE_CHAT" or event == "CHAT_MSG_INSTANCE_CHAT_LEADER" then
-    ReplyBreakStatusToGroup("INSTANCE_CHAT")
+  local channel = BreakQueryChannelForEvent(event)
+  if not channel then return end
+
+  if InCombatLockdown and InCombatLockdown() then
+    QueueBreakReplyAfterCombat(channel)
+    return
   end
+
+  ReplyBreakStatusToGroup(channel)
 end
 
 local function HandleSlash(msg)
@@ -1696,6 +1760,7 @@ f:RegisterEvent("CHAT_MSG_RAID")
 f:RegisterEvent("CHAT_MSG_RAID_LEADER")
 f:RegisterEvent("CHAT_MSG_INSTANCE_CHAT")
 f:RegisterEvent("CHAT_MSG_INSTANCE_CHAT_LEADER")
+f:RegisterEvent("PLAYER_REGEN_ENABLED")
 f:RegisterEvent("GROUP_ROSTER_UPDATE")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
 
@@ -1737,6 +1802,9 @@ f:SetScript("OnEvent", function(self, event, ...)
     or event == "CHAT_MSG_INSTANCE_CHAT_LEADER" then
     local msg = ...
     HandleBreakQueryChatEvent(event, msg)
+  elseif event == "PLAYER_REGEN_ENABLED" then
+    FlushQueuedSyncPayloadsAfterCombat()
+    FlushQueuedBreakReplyAfterCombat()
   elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
     if GetGroupChannel() ~= nil then
       SendHello()

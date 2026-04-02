@@ -109,7 +109,7 @@ local title = MakeTitle(panel, PANEL_NAME)
 local sub = MakeSubText(panel, title,
   "Synced break timer replacement.\n" ..
   "• Only leader/raid assist can start/extend/stop while grouped.\n" ..
-  "• This addon sends NO group/raid chat messages.\n" ..
+  "• No proactive chat spam (only explicit !break status replies when allowed).\n" ..
   "• /pull starts a pull countdown (big on-screen numbers + sounds).\n" ..
   "Tip: Hold ALT and drag the bar, big timer, or pull numbers to reposition."
 )

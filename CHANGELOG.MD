@@ -4,6 +4,12 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.3.6] - 2026-04-02
+### Fixed
+- Deferred `!break` status replies requested during combat and automatically sent one reply after combat ends, avoiding restricted chat calls.
+- Added combat-lockdown handling for addon sync sends (`AddOnMessageLockdown`) by queueing blocked payloads and flushing them after combat.
+- Updated in-game options wording to match current behavior (no proactive chat spam, explicit `!break` replies only when allowed).
+
 ## [1.3.5] - 2026-04-01
 ### Fixed
 - Hardened Blizzard API integration by validating modern addon-message return codes, sanitizing sync payloads, and using safer countdown/ready-check fallbacks.
