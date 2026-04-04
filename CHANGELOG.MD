@@ -4,6 +4,11 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.3.7] - 2026-04-03
+### Fixed
+- Restored reliable group sync by reading the final API return value from `C_ChatInfo.SendAddonMessage*` and `RegisterAddonMessagePrefix` calls, fixing wrapper/multi-return compatibility.
+- Ensured combat-lockdown detection uses the real addon-message result code so blocked sync payloads are queued and sent after combat as intended.
+
 ## [1.3.6] - 2026-04-02
 ### Fixed
 - Deferred `!break` status replies requested during combat and automatically sent one reply after combat ends, avoiding restricted chat calls.
