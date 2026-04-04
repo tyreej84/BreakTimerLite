@@ -1,6 +1,6 @@
 -- Core.lua
 -- Break Timer Lite
--- v1.3.7
+-- v1.3.8
 -- No proactive chat spam (only explicit !break status replies when allowed)
 --
 -- Fixes:
@@ -28,7 +28,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.3.7"
+local ADDON_VERSION = "1.3.8"
 local dbRepairedOnLoad = false
 
 local defaults = {
@@ -1128,6 +1128,14 @@ local function StartTimer(seconds, reason, silent, fromSync, callerName, authori
   local caller = callerName and callerName ~= "" and callerName or Ambiguate(UnitName("player") or "", "short")
   caller = SanitizeText(caller, 24)
   local auth = authorityRank or LocalAuthorityRank()
+
+  if grouped and not fromSync and state.running and (state.authority or 0) > auth then
+    local remShow = RemainingDisplaySeconds(RemainingPrecise())
+    local owner = state.caller ~= "" and state.caller or "another leader"
+    LocalPrint(string.format("A break is already running from higher authority (%s, %s remaining).", owner, FormatTimeFromSeconds(remShow)))
+    return false
+  end
+
   local startServer = startServerOverride or NowServer()
   local endServer = startServer + math.floor(seconds + 0.5)
 
@@ -1632,6 +1640,18 @@ local function SendStateTo(channel, target)
   SafeSendAddonPayload(payload, channel, target, true)
 end
 
+local function ReplyStateToPeerIfAuthorized(target)
+  if not target or target == "" then return end
+  if not state.running then return end
+  if not IsPrivilegedLocal() then return end
+
+  local shortTarget = SanitizeText(Ambiguate(target, "short"), 24)
+  if shortTarget == "" then return end
+  if Throttled("lastStateReply_" .. shortTarget, 0.8) then return end
+
+  SendStateTo("WHISPER", target)
+end
+
 local function OnAddonMessage(prefix, text, channel, sender)
   if prefix ~= PREFIX then return end
   if Ambiguate(sender or "", "short") == Ambiguate(UnitName("player") or "", "short") then return end
@@ -1648,13 +1668,12 @@ local function OnAddonMessage(prefix, text, channel, sender)
   end
 
   if action == "HELLO" then
+    ReplyStateToPeerIfAuthorized(sender)
     return
   end
 
   if action == "REQUEST" then
-    if not SenderIsPrivileged(sender) then return end
-    if not IsPrivilegedLocal() then return end
-    SendStateTo("WHISPER", sender)
+    ReplyStateToPeerIfAuthorized(sender)
     return
   end
 

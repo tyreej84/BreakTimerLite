@@ -4,6 +4,12 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.3.8] - 2026-04-04
+### Fixed
+- Improved existing-break visibility by having authorized clients proactively reply with current break `STATE` on both `HELLO` and `REQUEST`, so addon users joining late or recovering from missed broadcasts sync more reliably.
+- Added a local authority guard that prevents lower-authority local starts from overriding an already-running higher-authority break, with a clear local warning when blocked.
+- Preserved authoritative override behavior so higher-authority incoming starts/states still replace lower-authority timers.
+
 ## [1.3.7] - 2026-04-03
 ### Fixed
 - Restored reliable group sync by reading the final API return value from `C_ChatInfo.SendAddonMessage*` and `RegisterAddonMessagePrefix` calls, fixing wrapper/multi-return compatibility.
