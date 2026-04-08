@@ -1,6 +1,6 @@
 -- Core.lua
 -- Break Timer Lite
--- v1.3.8
+-- v1.3.9
 -- No proactive chat spam (only explicit !break status replies when allowed)
 --
 -- Fixes:
@@ -28,7 +28,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.3.8"
+local ADDON_VERSION = "1.3.9"
 local dbRepairedOnLoad = false
 
 local defaults = {
@@ -253,12 +253,17 @@ local function IsAddonAPIResultSuccess(result, enumTable)
   return false
 end
 
+local function PackResults(...)
+  local count = select("#", ...)
+  return { n = count, ... }
+end
+
 local function SafeRegisterAddonPrefix()
   if not (C_ChatInfo and type(C_ChatInfo.RegisterAddonMessagePrefix) == "function") then
     return false, "missing-api"
   end
 
-  local call = table.pack(pcall(C_ChatInfo.RegisterAddonMessagePrefix, PREFIX))
+  local call = PackResults(pcall(C_ChatInfo.RegisterAddonMessagePrefix, PREFIX))
   local ok = call[1]
   if not ok then
     return false, tostring(call[2] or "register-error")
@@ -293,7 +298,7 @@ local function SafeSendAddonPayload(payload, channel, target, preferLogged)
     sendFunc = C_ChatInfo.SendAddonMessageLogged
   end
 
-  local call = table.pack(pcall(sendFunc, PREFIX, payload, channel, target))
+  local call = PackResults(pcall(sendFunc, PREFIX, payload, channel, target))
   local ok = call[1]
   if not ok then
     return false, tostring(call[2] or "send-error")

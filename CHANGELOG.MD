@@ -4,6 +4,11 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.3.9] - 2026-04-08
+### Fixed
+- Fixed a runtime compatibility bug where `table.pack` was unavailable on some clients, causing addon sync initialization and message sends to error.
+- Replaced `table.pack` usage in addon-message API wrappers with a local compatible result-packing helper so prefix registration and sync traffic work reliably across clients.
+
 ## [1.3.8] - 2026-04-04
 ### Fixed
 - Improved existing-break visibility by having authorized clients proactively reply with current break `STATE` on both `HELLO` and `REQUEST`, so addon users joining late or recovering from missed broadcasts sync more reliably.
