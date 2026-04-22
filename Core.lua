@@ -1,6 +1,6 @@
 -- Core.lua
 -- Break Timer Lite
--- v1.4.0
+-- v1.4.1
 -- No proactive chat spam (only explicit !break status replies when allowed)
 --
 -- Fixes:
@@ -28,7 +28,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.4.0"
+local ADDON_VERSION = "1.4.1"
 local dbRepairedOnLoad = false
 
 local defaults = {
@@ -440,7 +440,6 @@ end
 local function SyncSend(payload, preferLogged)
   local ch = GetGroupChannel()
   if not ch then return false end
-  if Throttled("lastSync", 0.25) then return false, "throttled-local" end
   local ok, result = SafeSendAddonPayload(payload, ch, nil, preferLogged)
   if not ok and IsAddonMessageLockdownResult(result) then
     local action = payload:match("^([^;]+);") or "GENERIC"
@@ -850,7 +849,6 @@ local state = {
   authority = 0,
 
   ticker = nil,
-  warned10 = false,
   lastWhole = nil,
   baseBigScale = 1.6,
   shakeSeed = 0,
@@ -896,10 +894,19 @@ local function RemainingDisplaySeconds(remPrecise)
   return math.max(0, math.ceil(remPrecise))
 end
 
-local function Beep()
-  InitDB()
-  if not db.beeps then return end
-  SafePlaySound(SOUNDKIT and SOUNDKIT.UI_IG_MAINMENU_OPTION_CHECKBOX_ON, "Master")
+local function ResolveEffectiveSenderAuthority(senderShort, senderAuth, claimedAuth, claimedCaller)
+  senderAuth = tonumber(senderAuth or 0) or 0
+  claimedAuth = tonumber(claimedAuth or 0) or 0
+  if senderAuth >= 2 then
+    return senderAuth
+  end
+
+  local claimName = SanitizeText(claimedCaller or "", 24)
+  if claimName ~= "" and senderShort == claimName and claimedAuth >= 2 then
+    return claimedAuth
+  end
+
+  return senderAuth
 end
 
 local function BuildBarLeftText()
@@ -1015,7 +1022,6 @@ local function ShouldAcceptRemote(startServer, authorityRank)
 end
 
 local function ResetFlags()
-  state.warned10 = false
   state.lastWhole = nil
   state.shakeSeed = 0
   state.cdStarted = false
@@ -1100,19 +1106,7 @@ local function StartTimerWithServerTimes(startServer, endServer, reason, caller,
       EdgePulseOff()
     end
 
-    if whole == 10 and not state.warned10 then
-      state.warned10 = true
-      FlashScreen()
-      BigWarnLocal("Break ends in 10 seconds!")
-      if db.sound then SafePlaySound(SOUNDKIT and SOUNDKIT.RAID_WARNING, "Master") end
-      Beep()
-    end
-
-    if state.lastWhole ~= whole then
-      if whole == 3 then Beep() end
-      if whole == 1 then Beep() end
-      state.lastWhole = whole
-    end
+    state.lastWhole = whole
   end)
 
   return true
@@ -1247,7 +1241,6 @@ local function ExtendTimer(addSeconds, silent, fromSync, callerName)
     state.cdStarted = false
   end
 
-  state.warned10 = false
   state.lastWhole = nil
   PersistBreakState()
 
@@ -1663,7 +1656,7 @@ local function OnAddonMessage(prefix, text, channel, sender)
   if type(text) ~= "string" then return end
 
   local senderShort = SanitizeText(Ambiguate(sender or "", "short"), 24)
-  local auth = SenderAuthorityRank(sender)
+  local senderAuth = SenderAuthorityRank(sender)
 
   local action, a, b, c, d, e, f, g = strsplit(";", text)
   if not action or action == "" then return end
@@ -1683,13 +1676,14 @@ local function OnAddonMessage(prefix, text, channel, sender)
   end
 
   if action == "STATE" then
-    if auth < 2 then return end
     local startServer = tonumber(a or 0) or 0
     local endServer = tonumber(b or 0) or 0
     local reason = c or ""
     local caller = d or senderShort
-    local authority = tonumber(e or auth) or auth
+    local authority = ResolveEffectiveSenderAuthority(senderShort, senderAuth, tonumber(e or senderAuth) or senderAuth, caller)
     local cdFlag = tonumber(g or 0) or 0
+
+    if authority < 2 then return end
 
     if startServer > 0 and endServer > startServer then
       if ShouldAcceptRemote(startServer, authority) then
@@ -1701,19 +1695,27 @@ local function OnAddonMessage(prefix, text, channel, sender)
   end
 
   if action == "STOP" then
-    if auth < 2 then return end
+    local authority = senderAuth
+    if authority < 2 then
+      local callerShort = SanitizeText(a or senderShort, 24)
+      if state.running and callerShort ~= "" and callerShort == (state.caller or "") then
+        authority = state.authority or 0
+      end
+    end
+    if authority < 2 then return end
     local who = a or senderShort
     StopTimer(true, true, who)
     return
   end
 
   if action == "START" then
-    if auth < 2 then return end
     local startServer = tonumber(a or 0) or 0
     local endServer = tonumber(b or 0) or 0
     local reason = c or ""
     local caller = d or senderShort
-    local authority = tonumber(e or auth) or auth
+    local authority = ResolveEffectiveSenderAuthority(senderShort, senderAuth, tonumber(e or senderAuth) or senderAuth, caller)
+
+    if authority < 2 then return end
 
     if startServer > 0 and endServer > startServer then
       if ShouldAcceptRemote(startServer, authority) then
@@ -1724,7 +1726,9 @@ local function OnAddonMessage(prefix, text, channel, sender)
   end
 
   if action == "EXTEND" then
-    if auth < 2 then return end
+    local who = b or senderShort
+    local authority = ResolveEffectiveSenderAuthority(senderShort, senderAuth, state.authority or senderAuth, who)
+    if authority < 2 then return end
     local add = tonumber(a or 0) or 0
     local startServer = tonumber(c or 0) or 0
     local endServer = tonumber(d or 0) or 0
@@ -1735,7 +1739,6 @@ local function OnAddonMessage(prefix, text, channel, sender)
       state.duration = (state.endServer - state.startServer)
 
       if RemainingPrecise() > 10 then state.cdStarted = false end
-      state.warned10 = false
       state.lastWhole = nil
       PersistBreakState()
 
@@ -1759,11 +1762,12 @@ local function OnAddonMessage(prefix, text, channel, sender)
 
   if action == "PULL" then
     -- PULL;startServer;seconds;starter;authority;ver
-    if auth < 2 then return end
     local startServer = tonumber(a or 0) or 0
     local seconds = tonumber(b or 0) or 0
     local starter = c or senderShort
-    local authority = tonumber(d or auth) or auth
+    local authority = ResolveEffectiveSenderAuthority(senderShort, senderAuth, tonumber(d or senderAuth) or senderAuth, starter)
+
+    if authority < 2 then return end
 
     if startServer <= 0 or seconds <= 0 then return end
 

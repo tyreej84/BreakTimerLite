@@ -4,6 +4,14 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.4.1] - 2026-04-21
+### Fixed
+- Restored reliable group break sync for control actions by removing an over-aggressive local sync throttle that could drop `START`/`STOP`/`EXTEND`/`PULL` addon messages.
+- Hardened sender authority resolution for synced `START`/`STATE`/`EXTEND`/`PULL` actions so valid leader/assist messages still apply when unit lookups are temporarily unavailable.
+
+### Changed
+- Removed the break timer's automatic final-10 warning countdown behavior (including the forced 10-second warning trigger and per-second end beeps), while keeping the shared break timer bar sync behavior.
+
 ## [1.4.0] - 2026-04-21
 ### Changed
 - Updated Interface version to 120005 for Patch 12.0.5 compatibility.
