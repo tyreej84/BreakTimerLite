@@ -4,6 +4,11 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.4.0] - 2026-04-21
+### Changed
+- Updated Interface version to 120005 for Patch 12.0.5 compatibility.
+- Verified no breaking changes from 12.0.5 API updates (secret unit token restrictions on `UnitName` do not affect party/raid unit enumeration used by this addon).
+
 ## [1.3.9] - 2026-04-08
 ### Fixed
 - Fixed a runtime compatibility bug where `table.pack` was unavailable on some clients, causing addon sync initialization and message sends to error.
