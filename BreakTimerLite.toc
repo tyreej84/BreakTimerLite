@@ -2,7 +2,7 @@
 ## Title: Break Timer Lite
 ## Notes: Synced break timer (leader/assist only). Sleek bar + big countdown + banners. Local-only end-of-break warnings + ready check. NO chat spam. Includes /pull (big numbers + sounds), synced by addon messages.
 ## Author: Karnytine-Stormrage (joe@tyreenet.com)
-## Version: 1.4.1
+## Version: 1.4.2
 ## SavedVariables: BreakTimerDB
 
 Core.lua

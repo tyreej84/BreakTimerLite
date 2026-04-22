@@ -1,6 +1,6 @@
 -- Core.lua
 -- Break Timer Lite
--- v1.4.1
+-- v1.4.2
 -- No proactive chat spam (only explicit !break status replies when allowed)
 --
 -- Fixes:
@@ -28,7 +28,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.4.1"
+local ADDON_VERSION = "1.4.2"
 local dbRepairedOnLoad = false
 
 local defaults = {
@@ -1015,10 +1015,8 @@ local function TryReadyCheck()
 end
 
 local function ShouldAcceptRemote(startServer, authorityRank)
-  if not state.running then return true end
-  if authorityRank > (state.authority or 0) then return true end
-  if authorityRank < (state.authority or 0) then return false end
-  return startServer > (state.startServer or 0)
+  if state.running then return false end
+  return true
 end
 
 local function ResetFlags()
@@ -1128,10 +1126,12 @@ local function StartTimer(seconds, reason, silent, fromSync, callerName, authori
   caller = SanitizeText(caller, 24)
   local auth = authorityRank or LocalAuthorityRank()
 
-  if grouped and not fromSync and state.running and (state.authority or 0) > auth then
+  if grouped and state.running then
     local remShow = RemainingDisplaySeconds(RemainingPrecise())
-    local owner = state.caller ~= "" and state.caller or "another leader"
-    LocalPrint(string.format("A break is already running from higher authority (%s, %s remaining).", owner, FormatTimeFromSeconds(remShow)))
+    local owner = state.caller ~= "" and state.caller or "another player"
+    if not fromSync then
+      LocalPrint(string.format("A break is already running (%s, %s remaining). Use /break +<minutes> to extend or /break stop to cancel.", owner, FormatTimeFromSeconds(remShow)))
+    end
     return false
   end
 
@@ -1176,7 +1176,6 @@ local function StopTimer(silent, fromSync, callerName)
     state.pendingBreakReplyChannel = nil
     pendingSyncPayloads = {}
     ClearPersistedBreakState()
-    CancelBlizzardCountdownBestEffort()
     return
   end
 
@@ -1185,8 +1184,6 @@ local function StopTimer(silent, fromSync, callerName)
     LocalPrint("Only the leader (or raid assist) can stop the break timer.")
     return
   end
-
-  if not fromSync then CancelBlizzardCountdownBestEffort() end
 
   local who = (callerName and callerName ~= "" and callerName) or Ambiguate(UnitName("player") or "", "short")
   who = SanitizeText(who, 24)

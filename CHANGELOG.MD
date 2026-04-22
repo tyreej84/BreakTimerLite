@@ -4,6 +4,14 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.4.2] - 2026-04-21
+### Changed
+- While a break is active, new break starts are now always blocked for everyone (including leader/assist). Active breaks can only be extended or canceled.
+- Updated local start rejection messaging to direct users to `/break +<minutes>` and `/break stop`.
+
+### Fixed
+- Removed remaining break-path Blizzard countdown cancellation hooks so break stop/cancel no longer interacts with `/cd` APIs.
+
 ## [1.4.1] - 2026-04-21
 ### Fixed
 - Restored reliable group break sync for control actions by removing an over-aggressive local sync throttle that could drop `START`/`STOP`/`EXTEND`/`PULL` addon messages.
