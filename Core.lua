@@ -1,6 +1,6 @@
 -- Core.lua
 -- Break Timer Lite
--- v1.4.2
+-- v1.4.3
 -- No proactive chat spam (only explicit !break status replies when allowed)
 --
 -- Fixes:
@@ -28,7 +28,7 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.4.2"
+local ADDON_VERSION = "1.4.3"
 local dbRepairedOnLoad = false
 
 local defaults = {

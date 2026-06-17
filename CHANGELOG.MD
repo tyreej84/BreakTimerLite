@@ -4,6 +4,14 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.4.3] - 2026-06-17
+### Changed
+- Updated Interface version to 120007 for Patch 12.0.7 compatibility.
+- Reviewed current chat, addon-message, and countdown API usage for 12.0.7 readiness.
+
+### Packaging
+- Bumped addon version to `1.4.3`.
+
 ## [1.4.2] - 2026-04-21
 ### Changed
 - While a break is active, new break starts are now always blocked for everyone (including leader/assist). Active breaks can only be extended or canceled.
