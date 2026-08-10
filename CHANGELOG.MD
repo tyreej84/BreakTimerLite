@@ -4,6 +4,17 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.4.4] - 2026-08-10
+### Fixed
+- Registered `CHAT_MSG_ADDON_LOGGED` so logged `START` and `STATE` messages display the synchronized break timer on receiving clients.
+
+### Changed
+- Removed the `/pull` command, pull overlay, pull synchronization, and pull-specific options.
+- Updated Interface version to 120100 for Patch 12.1.0 compatibility.
+
+### Packaging
+- Bumped addon version to `1.4.4`.
+
 ## [1.4.3] - 2026-06-17
 ### Changed
 - Updated Interface version to 120007 for Patch 12.0.7 compatibility.

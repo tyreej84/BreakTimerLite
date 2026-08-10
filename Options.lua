@@ -3,7 +3,6 @@
 -- Layout:
 --  - Two columns (no scrolling)
 --  - ALL SLIDERS are on the LEFT column (prevents slider going out of bounds)
---  - Pull timer options included
 
 local ADDON, ns = ...
 local PANEL_NAME = "Break Timer Lite"
@@ -17,7 +16,6 @@ local function GetDB()
   -- ensure tables (in case Options loads early)
   if type(d.big) ~= "table" then d.big = {} end
   if type(d.banner) ~= "table" then d.banner = {} end
-  if type(d.pull) ~= "table" then d.pull = {} end
   return d
 end
 
@@ -110,8 +108,7 @@ local sub = MakeSubText(panel, title,
   "Synced break timer replacement.\n" ..
   "• Only leader/raid assist can start/extend/stop while grouped.\n" ..
   "• No proactive chat spam (only explicit !break status replies when allowed).\n" ..
-  "• /pull starts a pull countdown (big on-screen numbers + sounds).\n" ..
-  "Tip: Hold ALT and drag the bar, big timer, or pull numbers to reposition."
+  "Tip: Hold ALT and drag the bar or big timer to reposition."
 )
 
 -- Column anchors
@@ -172,30 +169,7 @@ local sBigScale = MakeSlider("BreakTimerLiteOptBigScale", colLeft, headerBigScal
   300
 )
 
-local headerPull = MakeHeader(colLeft, sBigScale, "Pull Timer")
-
-local sPullScale = MakeSlider("BreakTimerLiteOptPullScale", colLeft, headerPull,
-  "Pull number scale",
-  "Adjust the size of the pull countdown numbers.",
-  1.5, 5.0, 0.1,
-  function() return GetDB().pull.scale end,
-  function(v)
-    GetDB().pull.scale = v
-    if ns.SetPullScale then ns.SetPullScale() end
-  end,
-  300
-)
-
-local sPullDefault = MakeSlider("BreakTimerLiteOptPullDefault", colLeft, sPullScale,
-  "Default /pull seconds",
-  "When you type /pull with no arguments, this is the default duration (in seconds).",
-  5, 30, 1,
-  function() return tonumber(GetDB().pull.defaultSeconds) or 10 end,
-  function(v) GetDB().pull.defaultSeconds = v end,
-  300
-)
-
-local headerDefaults = MakeHeader(colLeft, sPullDefault, "Defaults")
+local headerDefaults = MakeHeader(colLeft, sBigScale, "Defaults")
 
 local sDefault = MakeSlider("BreakTimerLiteOptDefaultMin", colLeft, headerDefaults,
   "Default /break minutes",
@@ -278,30 +252,7 @@ local cbBigFlash = MakeCheck("BreakTimerLiteOptBigFlash", colRight, cbBigShake,
   function(v) GetDB().big.flashLast5 = v end
 )
 
-local headerPullChecks = MakeHeader(colRight, cbBigFlash, "Pull Timer")
-
-local cbPullEnabled = MakeCheck("BreakTimerLiteOptPullEnabled", colRight, headerPullChecks,
-  "Enable pull timer overlay",
-  "Shows large on-screen numbers for /pull (local only).",
-  function() return GetDB().pull.enabled ~= false end,
-  function(v) GetDB().pull.enabled = v end
-)
-
-local cbPullSound10 = MakeCheck("BreakTimerLiteOptPullSound10", colRight, cbPullEnabled,
-  "Sound at 10 seconds (pull timer)",
-  "Plays a sound when the pull countdown hits 10.",
-  function() return GetDB().pull.soundAt10 ~= false end,
-  function(v) GetDB().pull.soundAt10 = v end
-)
-
-local cbPullSoundLast = MakeCheck("BreakTimerLiteOptPullSoundLast", colRight, cbPullSound10,
-  "Sound at 5 to 1 (pull timer)",
-  "Plays a sound at 5, 4, 3, 2, 1 during the pull countdown.",
-  function() return GetDB().pull.soundLast5 ~= false end,
-  function(v) GetDB().pull.soundLast5 = v end
-)
-
-local headerBanners = MakeHeader(colRight, cbPullSoundLast, "Banners")
+local headerBanners = MakeHeader(colRight, cbBigFlash, "Banners")
 
 local cbBanner = MakeCheck("BreakTimerLiteOptBanner", colRight, headerBanners,
   "Enable banners",
@@ -316,8 +267,6 @@ panel:SetScript("OnShow", function()
   sWidth:GetScript("OnShow")(sWidth)
   sHeight:GetScript("OnShow")(sHeight)
   sBigScale:GetScript("OnShow")(sBigScale)
-  sPullScale:GetScript("OnShow")(sPullScale)
-  sPullDefault:GetScript("OnShow")(sPullDefault)
   sDefault:GetScript("OnShow")(sDefault)
 
   -- checks
@@ -330,10 +279,6 @@ panel:SetScript("OnShow", function()
   cbBigPulse:GetScript("OnShow")(cbBigPulse)
   cbBigShake:GetScript("OnShow")(cbBigShake)
   cbBigFlash:GetScript("OnShow")(cbBigFlash)
-
-  cbPullEnabled:GetScript("OnShow")(cbPullEnabled)
-  cbPullSound10:GetScript("OnShow")(cbPullSound10)
-  cbPullSoundLast:GetScript("OnShow")(cbPullSoundLast)
 
   cbBanner:GetScript("OnShow")(cbBanner)
 end)
