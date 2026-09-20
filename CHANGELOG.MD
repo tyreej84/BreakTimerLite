@@ -4,6 +4,24 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.4.6] - 2026-09-17
+### Fixed
+- Restored the original `/break` behavior: no new local duration limit, extension cap, or boss-encounter restriction.
+- Kept compatibility broadcasts alongside the existing timer behavior so group members using boss addons can see supported breaks. Their own display restrictions do not restrict Break Timer Lite.
+
+## [1.4.5] - 2026-09-16
+### Added
+- Two-way party/raid break synchronization with BigWigs and DBM, including addons on the same client.
+- Shared start, cancellation, and updated remaining time after extensions, without rebroadcast loops.
+- Full name/realm and group-authority validation for boss-addon messages, duplicate filtering, and a remaining-time-aware retry after communication lockdown.
+
+### Changed
+- Break starts now use the shared 1–60 minute range; extensions allow up to 60 minutes remaining. Local break controls are blocked during boss encounters.
+- Documented `/bt` and `/breaktimer` for use when another addon also registers `/break`, plus solo and late-join boundaries.
+
+### Validation
+- Automated mocked-client integration checks cover protocol messages, both arrival orders, permissions, cancellation, extensions, and lockdown retries. Live mixed-addon group testing remains required.
+
 ## [1.4.4] - 2026-08-10
 ### Fixed
 - Registered `CHAT_MSG_ADDON_LOGGED` so logged `START` and `STATE` messages display the synchronized break timer on receiving clients.

@@ -2,8 +2,9 @@
 ## Title: Break Timer Lite
 ## Notes: Synced break timer (leader/assist only). Sleek bar + big countdown + banners. Local-only end-of-break warnings + ready check. No proactive chat spam.
 ## Author: Karnytine-Stormrage (joe@tyreenet.com)
-## Version: 1.4.4
+## Version: 1.4.6
 ## SavedVariables: BreakTimerDB
 
+BossModSync.lua
 Core.lua
 Options.lua

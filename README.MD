@@ -10,11 +10,15 @@ A lightweight, synced break timer addon for World of Warcraft.
 
 ### Addon Coverage Note
 
-Break Timer Lite works best when everyone in your party or raid has the addon installed.
+Break Timer Lite synchronizes party and raid breaks with **BigWigs and DBM**.
 
-- Synced break timers and late-join sync require other players to also run Break Timer Lite.
-- Players without the addon will not see the addon UI elements and addon-driven sync behavior.
-- For the most consistent timer experience across the whole group, install it on all members.
+- Starting or stopping a break in any of these addons updates the others in the group, including boss addons running on the same client.
+- Extending a break in Break Timer Lite updates the remaining duration in the boss addons.
+- You do not need either boss addon installed to communicate with group members using them.
+- Each player sees their own addon's display and warnings. Custom reasons and late-join state requests remain Break Timer Lite features; this does not add cross-addon late-join recovery.
+- Keep using **`/break`** exactly as before, including reasons, extensions, cancellation, and your configured default duration. Compatibility messages are sent in addition to the existing Break Timer Lite messages.
+- Break Timer Lite keeps its original duration and encounter behavior. Other addons apply their own limits (including a 1–60 minute range and encounter restrictions), so they may not display every timer that Break Timer Lite supports.
+- Solo timers remain local to Break Timer Lite; cross-addon synchronization uses party/raid addon messages.
 
 - **Synced timers** across the party/raid via addon communication
 - **Leader/assist control**
@@ -40,7 +44,7 @@ Break Timer Lite works best when everyone in your party or raid has the addon in
 - **Group chat status query**
   - During an active break, anyone can type `!break` in party/raid/instance chat to get a time-left reply
 - **Conflict handling**
-  - If multiple breaks are started, the timer from the **highest authority** wins
+  - Only group leaders/raid assistants can control synchronized breaks. Incoming boss-addon duration changes update the active break; duplicate broadcasts do not restart it.
 
 ---
 

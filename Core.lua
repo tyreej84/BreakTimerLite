@@ -1,6 +1,6 @@
 -- Core.lua
 -- Break Timer Lite
--- v1.4.4
+-- v1.4.6
 -- No proactive chat spam (only explicit !break status replies when allowed)
 --
 -- Fixes:
@@ -20,7 +20,8 @@
 
 local ADDON, ns = ...
 local PREFIX = "BreakTimerLite"
-local ADDON_VERSION = "1.4.4"
+local ADDON_VERSION = "1.4.6"
+local BossModSync = ns.BossModSync
 local dbRepairedOnLoad = false
 
 local defaults = {
@@ -231,12 +232,12 @@ local function PackResults(...)
   return { n = count, ... }
 end
 
-local function SafeRegisterAddonPrefix()
+local function SafeRegisterAddonPrefix(prefix)
   if not (C_ChatInfo and type(C_ChatInfo.RegisterAddonMessagePrefix) == "function") then
     return false, "missing-api"
   end
 
-  local call = PackResults(pcall(C_ChatInfo.RegisterAddonMessagePrefix, PREFIX))
+  local call = PackResults(pcall(C_ChatInfo.RegisterAddonMessagePrefix, prefix or PREFIX))
   local ok = call[1]
   if not ok then
     return false, tostring(call[2] or "register-error")
@@ -258,7 +259,7 @@ local function SafeRegisterAddonPrefix()
   return false, result
 end
 
-local function SafeSendAddonPayload(payload, channel, target, preferLogged)
+local function SafeSendAddonPayload(payload, channel, target, preferLogged, prefix)
   if not (C_ChatInfo and type(C_ChatInfo.SendAddonMessage) == "function") then
     return false, "missing-api"
   end
@@ -271,7 +272,7 @@ local function SafeSendAddonPayload(payload, channel, target, preferLogged)
     sendFunc = C_ChatInfo.SendAddonMessageLogged
   end
 
-  local call = PackResults(pcall(sendFunc, PREFIX, payload, channel, target))
+  local call = PackResults(pcall(sendFunc, prefix or PREFIX, payload, channel, target))
   local ok = call[1]
   if not ok then
     return false, tostring(call[2] or "send-error")
@@ -1007,6 +1008,7 @@ local function StartTimer(seconds, reason, silent, fromSync, callerName, authori
 
   if grouped and not fromSync then
     SyncSend(BuildSyncPayload("START", startServer, endServer, reason, caller, auth, ADDON_VERSION), true)
+    BossModSync.Send(endServer - NowServer())
   end
 
   return true
@@ -1037,6 +1039,7 @@ end
 
 local function StopTimer(silent, fromSync, callerName)
   InitDB()
+  if fromSync then BossModSync.CancelPending() end
   if not state.running then
     state.pendingBreakReplyChannel = nil
     pendingSyncPayloads = {}
@@ -1074,6 +1077,7 @@ local function StopTimer(silent, fromSync, callerName)
 
   if grouped and not fromSync then
     SyncSend(BuildSyncPayload("STOP", who))
+    BossModSync.Send(0)
   end
 end
 
@@ -1114,9 +1118,36 @@ local function ExtendTimer(addSeconds, silent, fromSync, callerName)
 
   if grouped and not fromSync then
     SyncSend(BuildSyncPayload("EXTEND", math.floor(addSeconds + 0.5), who, state.startServer, state.endServer))
+    BossModSync.Send(state.endServer - NowServer())
   end
 
   return true
+end
+
+local function ReceiveBossModBreak(seconds, sender, authority)
+  local caller = SanitizeText(Ambiguate(sender, "short"), 24)
+  if seconds == 0 then
+    StopTimer(true, true, caller)
+    return
+  end
+  local now = NowServer()
+  -- Native and compatibility packets can arrive in either order. Keep the
+  -- richer native reason/metadata and avoid replaying banners or resetting UI.
+  if state.running and math.abs(state.endServer - (now + seconds)) <= 2 then return end
+  if state.running then
+    if state.caller ~= caller then state.reason = "" end
+    state.caller = caller
+    state.authority = authority
+    state.endServer = now + seconds
+    state.endLocal = GetTime() + seconds
+    state.duration = state.endServer - state.startServer
+    ResetFlags()
+    PersistBreakState()
+    UpdateBar(RemainingPrecise())
+    UpdateBig(RemainingPrecise(), seconds)
+    return
+  end
+  StartTimerWithServerTimes(now, now + seconds, "", caller, authority, true, true)
 end
 
 -- ------------------------------------------------------------
@@ -1431,6 +1462,17 @@ local function OnAddonMessage(prefix, text, channel, sender)
 
     if authority < 2 then return end
 
+    if state.running and state.caller == SanitizeText(caller, 24)
+      and math.abs(state.endServer - endServer) <= 2 then
+      state.startServer = startServer
+      state.endServer = endServer
+      state.endLocal = GetTime() + endServer - NowServer()
+      state.duration = endServer - startServer
+      state.reason = SanitizeText(reason, 80)
+      PersistBreakState()
+      return
+    end
+
     if startServer > 0 and endServer > startServer then
       if ShouldAcceptRemote(startServer, authority) then
         StartTimerWithServerTimes(startServer, endServer, reason, caller, authority, true, true)
@@ -1510,6 +1552,15 @@ f:SetScript("OnEvent", function(self, event, ...)
       LocalPrint("Warning: addon sync prefix could not be registered on this client.")
     end
 
+    BossModSync.Initialize({
+      register = SafeRegisterAddonPrefix,
+      send = SafeSendAddonPayload,
+      channel = GetGroupChannel,
+      lockdown = IsAddonMessageLockdownResult,
+      warn = LocalPrint,
+      receive = ReceiveBossModBreak,
+    })
+
     RestorePersistedBreakState()
 
     if dbRepairedOnLoad then
@@ -1521,6 +1572,7 @@ f:SetScript("OnEvent", function(self, event, ...)
   elseif event == "CHAT_MSG_ADDON" or event == "CHAT_MSG_ADDON_LOGGED" then
     local prefix, text, channel, sender = ...
     OnAddonMessage(prefix, text, channel, sender)
+    BossModSync.Receive(prefix, text, channel, sender)
   elseif event == "CHAT_MSG_PARTY"
     or event == "CHAT_MSG_PARTY_LEADER"
     or event == "CHAT_MSG_RAID"
@@ -1531,6 +1583,7 @@ f:SetScript("OnEvent", function(self, event, ...)
     HandleBreakQueryChatEvent(event, msg)
   elseif event == "PLAYER_REGEN_ENABLED" then
     FlushQueuedSyncPayloadsAfterCombat()
+    BossModSync.Flush()
     FlushQueuedBreakReplyAfterCombat()
   elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
     if GetGroupChannel() ~= nil then
