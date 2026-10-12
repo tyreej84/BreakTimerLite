@@ -4,6 +4,10 @@ All notable changes to **Break Timer Lite** are documented in this file.
 
 ---
 
+## [1.4.7] - 2026-10-12
+### Changed
+- Updated addon interface metadata to Retail 12.1.5 (`## Interface: 120105`). No behavior changes.
+
 ## [1.4.6] - 2026-09-17
 ### Fixed
 - Restored the original `/break` behavior: no new local duration limit, extension cap, or boss-encounter restriction.
